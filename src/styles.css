@@ -1,0 +1,115 @@
+/* ====== Tema global — Técnicas de Programación Concurrente ====== */
+:root {
+  --bg: #0d1117;
+  --bg-soft: #161b26;
+  --panel: #1c2333;
+  --panel-2: #232b3e;
+  --border: #2d3750;
+  --text: #e6e9f0;
+  --text-dim: #9aa4bf;
+  --accent: #f0883e;
+  --green: #4caf50;
+  --orange: #f68c1f;
+  --red: #ef5350;
+  --purple: #a78bfa;
+  --yellow: #ffd54f;
+  --blue: #58a6ff;
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  line-height: 1.65;
+  scroll-behavior: smooth;
+}
+
+a { color: var(--blue); text-decoration: none; }
+
+code {
+  background: #0b0f19;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 1px 6px;
+  font-family: 'Cascadia Code', Consolas, monospace;
+  font-size: 0.88em;
+  color: #7ee787;
+  white-space: nowrap;
+}
+
+/* Contenido de los temas (innerHTML) */
+.topic-body p { margin: 0 0 12px; color: var(--text); }
+.topic-body ul { margin: 8px 0 14px; padding-left: 22px; }
+.topic-body ol { margin: 8px 0 14px; padding-left: 22px; }
+.topic-body li { margin-bottom: 7px; }
+.topic-body strong { color: #fff; }
+.topic-body em { color: var(--text-dim); }
+
+.topic-body .tip {
+  display: block;
+  background: rgba(240, 136, 62, 0.08);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  padding: 10px 14px;
+  margin: 12px 0;
+  font-size: 0.95em;
+}
+.topic-body .tip::before {
+  content: '🎯 Para el oral: ';
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.topic-body .warn {
+  display: block;
+  background: rgba(239, 83, 80, 0.08);
+  border-left: 3px solid var(--red);
+  border-radius: 0 8px 8px 0;
+  padding: 10px 14px;
+  margin: 12px 0;
+  font-size: 0.95em;
+}
+.topic-body .warn::before {
+  content: '⚠️ Trampa: ';
+  font-weight: 700;
+  color: var(--red);
+}
+
+.topic-body .rust {
+  display: block;
+  background: #0b0f19;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 12px 0;
+  font-family: 'Cascadia Code', Consolas, monospace;
+  font-size: 0.84em;
+  color: #c9d1d9;
+  white-space: pre;
+  overflow-x: auto;
+  line-height: 1.5;
+}
+
+.topic-body .formula {
+  display: inline-block;
+  background: #0b0f19;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 10px;
+  font-family: 'Cascadia Code', Consolas, monospace;
+  color: var(--yellow);
+  font-size: 0.92em;
+}
+
+::selection { background: rgba(240, 136, 62, 0.35); }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover { background: #3d4a6b; }

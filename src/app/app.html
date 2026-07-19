@@ -1,0 +1,49 @@
+<div class="shell">
+  <aside class="sidebar" [class.open]="menuOpen()">
+    <a class="brand" routerLink="/" (click)="closeMenu()">
+      <span class="logo">🦀</span>
+      <span class="brand-txt">
+        <strong>Concurrentes</strong>
+        <small>TPC interactivo</small>
+      </span>
+    </a>
+
+    <nav class="nav">
+      <a
+        routerLink="/"
+        routerLinkActive="active"
+        [routerLinkActiveOptions]="{ exact: true }"
+        class="nav-item"
+        (click)="closeMenu()"
+      >
+        <span class="nav-icon">🏠</span> Inicio
+      </a>
+      @for (s of sections; track s.slug) {
+        <a
+          [routerLink]="['/s', s.slug]"
+          routerLinkActive="active"
+          class="nav-item"
+          [style.--c]="s.color"
+          (click)="closeMenu()"
+        >
+          <span class="nav-icon">{{ s.icon }}</span>
+          {{ s.short }}
+        </a>
+      }
+    </nav>
+
+    <div class="side-foot">Técnicas de Programación Concurrente · FIUBA</div>
+  </aside>
+
+  <button class="burger" (click)="toggleMenu()" aria-label="Menú">
+    {{ menuOpen() ? '✕' : '☰' }}
+  </button>
+
+  @if (menuOpen()) {
+    <div class="backdrop" (click)="closeMenu()"></div>
+  }
+
+  <main class="content">
+    <router-outlet />
+  </main>
+</div>
