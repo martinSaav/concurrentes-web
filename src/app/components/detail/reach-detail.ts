@@ -228,7 +228,7 @@ interface GEdge {
     .netdesc { color: var(--text-dim); font-size: 0.78rem; margin-bottom: 10px; line-height: 1.5; }
 
     .board { display: grid; grid-template-columns: 1fr 1.15fr; gap: 12px; }
-    .arena { position: relative; min-height: 330px; background: radial-gradient(ellipse at 50% 45%, #202a40 0%, #171e2e 80%); border: 1px solid var(--border); border-radius: 10px; }
+    .arena { position: relative; min-height: 420px; background: radial-gradient(ellipse at 50% 45%, #202a40 0%, #171e2e 80%); border: 1px solid var(--border); border-radius: 10px; }
     .arena svg { position: absolute; inset: 0; width: 100%; height: 100%; }
     .a-label { position: absolute; top: 6px; left: 10px; z-index: 2; font-size: 0.66rem; text-transform: uppercase; letter-spacing: 1px; color: #5c6a8e; font-weight: 700; }
     .arc { stroke: #5c6a8e; stroke-width: 0.35; }
