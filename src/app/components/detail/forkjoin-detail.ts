@@ -282,7 +282,7 @@ export class ForkjoinDetail extends SteppedAnim implements OnDestroy {
 
   readonly statusMsg = computed(() => {
     if (this.finished()) {
-      return '<strong>Para el oral:</strong> ¿dónde está la sincronización en fork-join? SOLO en el join. ¿Por qué no hay carreras? Porque los subproblemas no comparten estado mutable. ¿Qué limita el speedup? La parte secuencial (el merge final) + el costo de crear/coordinar hilos.';
+      return '<strong>Para fijar:</strong> ¿dónde está la sincronización en fork-join? SOLO en el join. ¿Por qué no hay carreras? Porque los subproblemas no comparten estado mutable. ¿Qué limita el speedup? La parte secuencial (el merge final) + el costo de crear/coordinar hilos.';
     }
     const i = this.index();
     if (i < 0) return 'Presioná ▶ Play. Vamos a ordenar [7 3 9 1 8 2 6 4] con mergesort paralelo, como en <code>mergesort.rs</code>.';

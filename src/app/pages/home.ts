@@ -8,7 +8,7 @@ import { SECTIONS } from '../data/content';
   imports: [RouterLink],
   template: `
     <div class="hero">
-      <div class="hero-tag">Técnicas de Programación Concurrente · FIUBA · Final oral</div>
+      <div class="hero-tag">Técnicas de Programación Concurrente · FIUBA · Resumen interactivo</div>
       <h1>Concurrencia <span class="grad">sin miedo</span></h1>
       <p class="sub">
         El resumen completo de la materia — de los hilos y locks a los sistemas distribuidos,

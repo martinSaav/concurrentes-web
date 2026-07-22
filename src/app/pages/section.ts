@@ -18,6 +18,7 @@ import { TwophaseDetail } from '../components/detail/twophase-detail';
 import { DistmutexDetail } from '../components/detail/distmutex-detail';
 import { PetriDetail } from '../components/detail/petri-detail';
 import { ReachDetail } from '../components/detail/reach-detail';
+import { MemoryDetail } from '../components/detail/memory-detail';
 
 @Component({
   selector: 'app-section',
@@ -41,6 +42,7 @@ import { ReachDetail } from '../components/detail/reach-detail';
     DistmutexDetail,
     PetriDetail,
     ReachDetail,
+    MemoryDetail,
   ],
   template: `
     @if (section(); as sec) {
@@ -79,6 +81,7 @@ import { ReachDetail } from '../components/detail/reach-detail';
               @case ('distmutex-detail') { <app-distmutex-detail /> }
               @case ('petri-detail') { <app-petri-detail /> }
               @case ('reach-detail') { <app-reach-detail /> }
+              @case ('memory-detail') { <app-memory-detail /> }
             }
           </article>
         }

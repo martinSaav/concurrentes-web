@@ -270,7 +270,7 @@ export class CondvarDetail extends SteppedAnim implements OnDestroy {
 
   readonly statusMsg = computed(() => {
     if (this.finished()) {
-      return '<strong>Resumen para el oral:</strong> wait() = soltar el lock + dormirse, atómico; al despertar re-adquiere el lock; la condición se re-chequea con <code>while</code> por los spurious wakeups y por los hilos que se cuelan. notify_one() despierta uno; notify_all() despierta a todos (y todos re-compiten por el lock).';
+      return '<strong>Resumen:</strong> wait() = soltar el lock + dormirse, atómico; al despertar re-adquiere el lock; la condición se re-chequea con <code>while</code> por los spurious wakeups y por los hilos que se cuelan. notify_one() despierta uno; notify_all() despierta a todos (y todos re-compiten por el lock).';
     }
     const i = this.index();
     if (i < 0) {

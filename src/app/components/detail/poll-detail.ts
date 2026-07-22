@@ -229,7 +229,7 @@ export class PollDetail extends SteppedAnim implements OnDestroy {
 
   readonly statusMsg = computed(() => {
     if (this.finished()) {
-      return '<strong>Para el oral:</strong> ¿qué pasa al invocar una async fn? Nada: retorna un future perezoso. ¿Quién la ejecuta? El executor, a golpes de poll. ¿Poll bloquea? JAMÁS: retorna Ready o Pending. ¿Cómo "continúa" tras un await? El future es una máquina de estados que guarda el punto y las variables. ¿Y quién avisa que hay progreso? El waker del Context.';
+      return '<strong>Las preguntas clave:</strong> ¿qué pasa al invocar una async fn? Nada: retorna un future perezoso. ¿Quién la ejecuta? El executor, a golpes de poll. ¿Poll bloquea? JAMÁS: retorna Ready o Pending. ¿Cómo "continúa" tras un await? El future es una máquina de estados que guarda el punto y las variables. ¿Y quién avisa que hay progreso? El waker del Context.';
     }
     const i = this.index();
     if (i < 0) {
