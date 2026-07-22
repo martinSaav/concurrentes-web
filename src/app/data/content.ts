@@ -13,6 +13,7 @@ export interface Topic {
     | 'mpsc-detail'
     | 'actors-detail'
     | 'async-detail'
+    | 'poll-detail'
     | 'leader-detail'
     | 'twophase-detail'
     | 'distmutex-detail'
@@ -365,16 +366,93 @@ while !*started {
     tagline: 'Miles de tareas de I/O sin miles de hilos: futures, poll, executor.',
     topics: [
       {
-        title: 'Futures y el executor',
+        title: 'El problema de los threads',
+        html: `
+<p>Un hilo del SO no es gratis: cada uno reserva su <strong>stack</strong> — típicamente ~100 kB, en Linux desde 20 kB. Si una aplicación crea miles de hilos (un servidor con miles de conexiones abiertas), la <strong>demanda de memoria</strong> se vuelve el cuello de botella, mucho antes que la CPU.</p>
+<p>Y la mayoría de esos hilos ni siquiera están trabajando: están <strong>bloqueados en una system call</strong> esperando la red o el disco. Mirá el timeline de una request sincrónica típica: <code>connect</code>, <code>write_all</code>, <code>read_to_string</code> — entre cada una, el hilo pasa la mayor parte del tiempo en <strong>waiting</strong>, sin poder hacer otra cosa.</p>
+<span class="tip">La comparación numérica de la cátedra: crear un thread en Linux ≈ 15 µs; crear una tarea async ≈ 300 ns. Y el cambio de contexto entre tareas async es más barato que entre threads. Para I/O masivo, async gana por varios órdenes de magnitud.</span>`,
+      },
+      {
+        title: 'Tareas asincrónicas de Rust',
+        html: `
+<p>Las <strong>tareas asincrónicas</strong> intercalan trabajo en un único thread (o en un pool chico). Son mucho más <strong>livianas</strong> que los threads, más rápidas de crear y con menos overhead de memoria → podés tener <strong>miles o decenas de miles</strong> en un programa.</p>
+<p>Lo lindo: el código async <strong>se parece</strong> al sincrónico. Es casi el mismo, salvo las operaciones que bloquean, que se manejan distinto. Compará el acceptor de un servidor:</p>
+<span class="rust">// sincrónico — un thread por conexión
+for socket in listener.incoming() {
+    let groups = chat_table.clone();
+    thread::spawn(|| serve(socket?, groups));
+}
+
+// asincrónico — una TAREA por conexión
+let mut conns = listener.incoming();
+while let Some(socket) = conns.next().await {
+    let groups = chat_table.clone();
+    task::spawn(async { serve(socket?, groups).await });
+}</span>
+<p>Mismo esqueleto: el <code>.await</code> marca dónde la tarea puede ceder el control, y <code>spawn</code> lanza tareas en vez de hilos.</p>`,
+      },
+      {
+        title: 'Futures: el modelo piñata',
+        widget: 'poll-detail',
+        html: `
+<p>Rust modela "un resultado que todavía no está" con el trait <code>Future</code>:</p>
+<span class="rust">trait Future {
+    type Output;
+    fn poll(self: Pin&lt;&amp;mut Self&gt;, cx: &amp;mut Context) -&gt; Poll&lt;Self::Output&gt;;
+}
+enum Poll&lt;T&gt; { Ready(T), Pending }</span>
+<ul>
+<li><code>poll()</code> pregunta "¿ya terminaste?". Devuelve <code>Ready(output)</code> si sí, <code>Pending</code> si todavía no. <strong>Nunca bloquea</strong>: contesta al toque y se va.</li>
+<li>Modelo <strong>piñata</strong> 🪅 de la cátedra: lo único que podés hacer con un future es <strong>pegarle con poll</strong> hasta que caiga el valor. Cada poll <strong>avanza todo lo que puede</strong> y guarda el estado para el próximo.</li>
+<li>El SO provee las system calls (epoll/kqueue) que dicen <em>cuándo</em> vale la pena pollear de nuevo — no se pollea a lo loco.</li>
+</ul>
+<p>El crate <strong><code>async-std</code></strong> provee versiones async de la I/O de la std (incluido un <code>Read</code> asincrónico). La animación sigue el <code>cheapo_request</code> de la teórica poll por poll.</p>`,
+      },
+      {
+        title: 'async fn y expresiones await',
+        html: `
+<p>Al compilar, una <code>async fn</code> se transforma en una <strong>máquina de estados</strong>. Los puntos clave:</p>
+<ul>
+<li>Invocar una async fn <strong>retorna inmediatamente</strong>, antes de ejecutar el cuerpo: devuelve un <code>Future</code> que guarda los argumentos y el espacio para las variables locales.</li>
+<li>Al pollearla la primera vez, se ejecuta el cuerpo <strong>hasta el primer <code>await</code></strong>. Si el sub-future no está listo, retorna <code>Pending</code> y la función entera devuelve Pending.</li>
+<li>La expresión <code>await</code> toma ownership del future, le hace poll: si da <code>Ready</code>, el valor se desenvuelve y la ejecución <strong>continúa</strong>; si da <code>Pending</code>, propaga Pending a quien la invocó.</li>
+<li>El future <strong>almacena el punto donde retomar</strong>: el siguiente poll continúa desde ese await, no desde el principio. Por eso las variables locales viven adentro del future, no en el stack.</li>
+</ul>
+<span class="warn">Las expresiones <code>await</code> solo se pueden usar dentro de funciones <code>async</code>. Tiene sentido: son justamente los puntos donde la función necesita poder pausarse y ceder — algo que una función sincrónica común no sabe hacer.</span>`,
+      },
+      {
+        title: 'Executors: block_on, spawn y el pool',
         widget: 'async-detail',
         html: `
-<p>Para cargas dominadas por <strong>I/O</strong> (miles de conexiones esperando), un hilo por tarea desperdicia memoria y context switches. Async: una <strong>future</strong> es un valor perezoso que representa "un resultado que va a estar"; el <strong>executor</strong> (ej: Tokio) hace <code>poll()</code> sobre las futures y las avanza.</p>
+<p>Las futures son perezosas: <strong>alguien tiene que pollearlas</strong>. Ese alguien es el <strong>executor</strong>.</p>
 <ul>
-<li><code>async fn</code> compila a una <strong>máquina de estados</strong>; cada <code>.await</code> es un punto donde la tarea puede <strong>ceder el control</strong> (cooperativo, no preemptivo).</li>
-<li>Si el poll da <code>Pending</code>, la tarea se estaciona y el <strong>waker</strong> la re-agenda cuando el recurso está listo.</li>
-<li>Las futures <strong>no hacen nada</strong> hasta que alguien las pollea (lazy) — a diferencia de un hilo, que corre apenas nace.</li>
+<li><strong><code>block_on(future)</code></strong>: función <strong>sincrónica</strong> que corre un future hasta obtener su valor final. Es el <em>adaptador</em> del mundo async al sincrónico (típicamente en <code>main</code>). Sabe cuánto dormir entre polls gracias al waker — no hace busy-waiting. <span class="warn">Nunca lo llames dentro de una función async: bloquea el thread entero y con él todas las demás tareas.</span></li>
+<li><strong><code>task::spawn_local(future)</code></strong>: agrega un future al pool que el <code>block_on</code> ya está corriendo, para que se pollee <em>junto con</em> los demás. Análogo a <code>thread::spawn</code>, pero las tareas comparten thread. Los lifetimes deben ser <code>'static</code>.</li>
+<li><strong><code>task::spawn(future)</code></strong>: lo coloca en un <strong>pool de threads</strong> dedicado a pollear futures — no necesita un block_on aparte.</li>
 </ul>
-<span class="warn">La cooperación es voluntaria: si una tarea hace <code>thread::sleep</code> o un cálculo largo SIN <code>.await</code>, el executor queda preso y TODAS las demás tareas se congelan. Bloqueante y async no se mezclan (para eso existe <code>spawn_blocking</code>).</span>`,
+<p>La clave: el cambio de una tarea a otra ocurre <strong>solo en los <code>await</code></strong>. Toda la ejecución async es en realidad una serie de llamadas sincrónicas a <code>poll</code> que retornan rápido. La animación muestra el executor repartiendo un thread entre tres tareas — y qué pasa si una lo acapara.</p>`,
+      },
+      {
+        title: 'Cómputos largos: no bloquees al executor',
+        html: `
+<p>El talón de Aquiles del modelo cooperativo: como el cambio de tarea <strong>solo ocurre en un <code>await</code></strong>, una función que hace un <strong>cómputo largo sin awaits</strong> no le da lugar a ninguna otra tarea. El executor queda preso.</p>
+<p>Las dos herramientas para eso:</p>
+<ul>
+<li><strong><code>task::yield_now().await</code></strong>: favorece el paralelismo cediendo voluntariamente el control. La primera vez que se pollea retorna <code>Pending</code> (y se re-agenda); la siguiente, <code>Ready(())</code>. Sirve para intercalar un loop pesado.</li>
+<li><strong><code>task::spawn_blocking(closure)</code></strong>: manda el trabajo bloqueante o pesado a <strong>otro thread del SO</strong> dedicado, para no congelar el executor.</li>
+</ul>
+<span class="warn">Regla mental de la cátedra (el meme de Drake): async <strong>SÍ</strong> para consultar servicios externos, leer archivos, servir requests HTTP. Async <strong>NO</strong> para calcular un factorial, multiplicar matrices, los filósofos o estado compartido con locks — eso es CPU y va con threads/rayon.</span>`,
+      },
+      {
+        title: 'El tipo Pin (por qué existe)',
+        html: `
+<p>La máquina de estados de una async fn suele contener <strong>referencias a sus propias variables locales</strong> (self-references): un puntero que apunta a otro campo del mismo future. Si ese future se <strong>moviera</strong> en memoria, el puntero quedaría apuntando a la dirección vieja → basura.</p>
+<ul>
+<li>Por eso <code>poll</code> recibe <code>Pin&lt;&amp;mut Self&gt;</code>: <strong><code>Pin</code></strong> es una promesa de que el valor <strong>no se va a mover</strong> de su lugar en memoria.</li>
+<li>Casi todos los tipos implementan el auto-trait <strong><code>Unpin</code></strong> (como <code>Send</code>/<code>Sync</code>): para ellos Pin no cambia nada. Solo los tipos marcados <code>!Unpin</code> —como los futures con self-references— quedan realmente "clavados".</li>
+<li>Con un <code>!Unpin</code>, Pin hace <strong>imposible</strong> llamar métodos que necesiten <code>&amp;mut T</code> y podrían moverlo (como <code>mem::swap</code>).</li>
+</ul>
+<span class="tip">Para el oral alcanza con el "por qué": los futures se auto-referencian, moverlos rompería esos punteros, y Pin es la garantía a nivel de tipos de que no se muevan. No hace falta pelear con la API de Pin — hace falta explicar el problema que resuelve.</span>`,
       },
     ],
   },

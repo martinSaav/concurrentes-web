@@ -12,6 +12,7 @@ import { AmdahlDetail } from '../components/detail/amdahl-detail';
 import { MpscDetail } from '../components/detail/mpsc-detail';
 import { ActorsDetail } from '../components/detail/actors-detail';
 import { AsyncDetail } from '../components/detail/async-detail';
+import { PollDetail } from '../components/detail/poll-detail';
 import { LeaderDetail } from '../components/detail/leader-detail';
 import { TwophaseDetail } from '../components/detail/twophase-detail';
 import { DistmutexDetail } from '../components/detail/distmutex-detail';
@@ -34,6 +35,7 @@ import { ReachDetail } from '../components/detail/reach-detail';
     MpscDetail,
     ActorsDetail,
     AsyncDetail,
+    PollDetail,
     LeaderDetail,
     TwophaseDetail,
     DistmutexDetail,
@@ -71,6 +73,7 @@ import { ReachDetail } from '../components/detail/reach-detail';
               @case ('mpsc-detail') { <app-mpsc-detail /> }
               @case ('actors-detail') { <app-actors-detail /> }
               @case ('async-detail') { <app-async-detail /> }
+              @case ('poll-detail') { <app-poll-detail /> }
               @case ('leader-detail') { <app-leader-detail /> }
               @case ('twophase-detail') { <app-twophase-detail /> }
               @case ('distmutex-detail') { <app-distmutex-detail /> }
