@@ -9,7 +9,6 @@ export interface Topic {
     | 'deadlock-detail'
     | 'rwlock-detail'
     | 'forkjoin-detail'
-    | 'amdahl-detail'
     | 'mpsc-detail'
     | 'actors-detail'
     | 'async-detail'
@@ -165,7 +164,7 @@ let resultado = handle.join().unwrap(); // espera y recupera el valor</span>
     icon: '🔱',
     color: '#4caf50',
     tag: 'Semana 2',
-    tagline: 'Dividir el trabajo, juntar los resultados: rayon, work stealing, Amdahl.',
+    tagline: 'Dividir el trabajo, juntar los resultados: rayon, work stealing, MapReduce.',
     topics: [
       {
         title: 'El modelo fork-join',
@@ -218,15 +217,6 @@ let s = ['a','b','c','d','e'].par_iter()
 </ul>
 <p><strong>MapReduce</strong> es el modelo de programación para procesar grandes volúmenes de datos con esta idea: divide el trabajo en dos partes — <strong>mapear</strong> los datos y luego <strong>reducirlos</strong> — y lo hace en paralelo usando muchas computadoras.</p>
 <span class="tip">Rayon te garantiza el paralelismo <em>potencial</em>: si hay un solo core, <code>join(a,b)</code> simplemente corre secuencial. El programa expresa la estructura; el runtime decide cuánto paralelismo real hay.</span>`,
-      },
-      {
-        title: 'Ley de Amdahl',
-        widget: 'amdahl-detail',
-        html: `
-<p>Si una fracción <span class="formula">s</span> del programa es inherentemente secuencial, el speedup máximo con N procesadores es:</p>
-<p><span class="formula">S(N) = 1 / (s + (1−s)/N)</span></p>
-<p>Con N → ∞, el techo es <span class="formula">1/s</span>: con solo 5% secuencial, jamás pasás de 20×, tengas 8 o 8000 cores. La parte secuencial <strong>domina</strong> a medida que agregás hardware.</p>
-<span class="warn">El speedup nunca es lineal en la práctica: además de Amdahl están los costos de crear/coordinar hilos, la contención en locks y la coherencia de caché. Agregar hilos puede EMPEORAR el tiempo.</span>`,
       },
     ],
   },
@@ -308,7 +298,7 @@ for _ in 0..N {
 <li>El combo <code>Arc&lt;Mutex&lt;T&gt;&gt;</code> = <strong>compartir</strong> (Arc) + <strong>mutar con exclusión</strong> (Mutex).</li>
 <li><code>lock()</code> devuelve <code>Err</code> si otro hilo hizo panic con el lock tomado: el mutex queda <strong>envenenado</strong> (poisoned) — el dato podría haber quedado inconsistente.</li>
 </ul>
-<span class="warn">Mantené la sección crítica CORTA. Todo lo que hacés con el lock tomado serializa el programa (Amdahl te cobra). Y nunca hagas I/O o esperas largas con un lock tomado.</span>`,
+<span class="warn">Mantené la sección crítica CORTA. Todo lo que hacés con el lock tomado serializa el programa: mientras uno está adentro, los demás no avanzan. Y nunca hagas I/O o esperas largas con un lock tomado.</span>`,
       },
       {
         title: 'Arc y Rc: compartir ownership',

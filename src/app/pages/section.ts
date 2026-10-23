@@ -8,7 +8,6 @@ import { CondvarDetail } from '../components/detail/condvar-detail';
 import { DeadlockDetail } from '../components/detail/deadlock-detail';
 import { RwlockDetail } from '../components/detail/rwlock-detail';
 import { ForkjoinDetail } from '../components/detail/forkjoin-detail';
-import { AmdahlDetail } from '../components/detail/amdahl-detail';
 import { MpscDetail } from '../components/detail/mpsc-detail';
 import { ActorsDetail } from '../components/detail/actors-detail';
 import { AsyncDetail } from '../components/detail/async-detail';
@@ -40,7 +39,6 @@ import { OptimisticDetail } from '../components/detail/optimistic-detail';
     DeadlockDetail,
     RwlockDetail,
     ForkjoinDetail,
-    AmdahlDetail,
     MpscDetail,
     ActorsDetail,
     AsyncDetail,
@@ -87,7 +85,6 @@ import { OptimisticDetail } from '../components/detail/optimistic-detail';
               @case ('deadlock-detail') { <app-deadlock-detail /> }
               @case ('rwlock-detail') { <app-rwlock-detail /> }
               @case ('forkjoin-detail') { <app-forkjoin-detail /> }
-              @case ('amdahl-detail') { <app-amdahl-detail /> }
               @case ('mpsc-detail') { <app-mpsc-detail /> }
               @case ('actors-detail') { <app-actors-detail /> }
               @case ('async-detail') { <app-async-detail /> }

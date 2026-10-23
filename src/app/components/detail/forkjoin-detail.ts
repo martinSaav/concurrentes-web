@@ -83,7 +83,7 @@ const STEPS: FjStep[] = [
   },
   {
     phase: 'join', threads: 1,
-    msg: 'JOIN final: el hilo original mergea las dos mitades. Notá la forma del paralelismo: mucho al fondo del árbol, poco arriba — el merge final es <strong>secuencial</strong> (hola, Amdahl 👋).',
+    msg: 'JOIN final: el hilo original mergea las dos mitades. Notá la forma del paralelismo: mucho al fondo del árbol, poco arriba — el merge final es <strong>secuencial</strong>, y esa parte no se acelera por más hilos que agregues.',
   },
   {
     phase: 'done', threads: 1,
