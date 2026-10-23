@@ -19,7 +19,15 @@ export interface Topic {
     | 'distmutex-detail'
     | 'petri-detail'
     | 'reach-detail'
-    | 'memory-detail'; // componentes a medida
+    | 'memory-detail'
+    | 'timeline-detail'
+    | 'sockets-detail'
+    | 'waitgraph-detail'
+    | 'barrier-detail'
+    | 'workstealing-detail'
+    | 'arc-detail'
+    | 'twopl-detail'
+    | 'optimistic-detail'; // componentes a medida
 }
 
 export interface Section {
@@ -177,6 +185,7 @@ let resultado = handle.join().unwrap(); // espera y recupera el valor</span>
       },
       {
         title: 'Work stealing',
+        widget: 'workstealing-detail',
         html: `
 <p>Algoritmo de <strong>scheduling</strong> de tareas entre threads. Los threads libres/inactivos (los que terminaron sus subtareas) intentan <strong>robarle</strong> tareas a los ocupados para balancear la carga.</p>
 <ul>
@@ -300,6 +309,18 @@ for _ in 0..N {
 <li><code>lock()</code> devuelve <code>Err</code> si otro hilo hizo panic con el lock tomado: el mutex queda <strong>envenenado</strong> (poisoned) — el dato podría haber quedado inconsistente.</li>
 </ul>
 <span class="warn">Mantené la sección crítica CORTA. Todo lo que hacés con el lock tomado serializa el programa (Amdahl te cobra). Y nunca hagas I/O o esperas largas con un lock tomado.</span>`,
+      },
+      {
+        title: 'Arc y Rc: compartir ownership',
+        widget: 'arc-detail',
+        html: `
+<p>En Rust cada valor tiene <strong>un solo dueño</strong>. Para que varios lo compartan existen los punteros con <strong>conteo de referencias</strong>: cada <code>clone()</code> sube el contador, cada <code>drop()</code> lo baja, y cuando llega a <strong>0</strong> se libera la memoria.</p>
+<ul>
+<li><strong><code>Rc&lt;T&gt;</code></strong> (reference counted): contador <strong>NO atómico</strong> → más rápido, pero solo válido <strong>dentro de un mismo hilo</strong>. <strong>No implementa <code>Send</code></strong>.</li>
+<li><strong><code>Arc&lt;T&gt;</code></strong> (atomically reference counted): el contador se actualiza con <strong>operaciones atómicas</strong> → se puede compartir entre hilos. Es <code>Send</code> + <code>Sync</code>.</li>
+</ul>
+<p>El motivo de fondo es exactamente la race condition del contador: <code>contador += 1</code> son tres instrucciones (load / add / store), y si dos hilos las entrelazan <strong>se pierde un incremento</strong>. Un contador que quedó bajo significa liberar la memoria <strong>mientras alguien todavía la usa</strong> → <em>use after free</em>.</p>
+<span class="warn">Ojo con la confusión típica: <code>Arc&lt;T&gt;</code> hace seguro <strong>compartir el puntero</strong>, NO mutar el dato. Para mutar hace falta además exclusión: por eso el combo es <code>Arc&lt;Mutex&lt;T&gt;&gt;</code> — Arc para compartir, Mutex para mutar.</span>`,
       },
       {
         title: 'RwLock: muchos lectores O un escritor',
@@ -472,6 +493,7 @@ while !*started {
       },
       {
         title: 'Barreras: todos esperan a todos',
+        widget: 'barrier-detail',
         html: `
 <p><code>Barrier::new(n)</code>: permiten sincronizar varios threads en <strong>puntos determinados</strong> de un cálculo o algoritmo. Se usan para que se esperen entre sí hasta que todos alcancen cierto punto. En Rust son <strong>reutilizables</strong> automáticamente tras cada sincronización.</p>
 <span class="rust">let barrier = Barrier::new(n);       // n = threads a sincronizar
@@ -704,6 +726,7 @@ let received = rx.recv().unwrap();</span>
     topics: [
       {
         title: 'El problema de los threads',
+        widget: 'timeline-detail',
         html: `
 <p>Un hilo del SO no es gratis: cada uno reserva su <strong>stack</strong> — típicamente ~100 kB, en Linux desde 20 kB. Si una aplicación crea miles de hilos (un servidor con miles de conexiones abiertas), la <strong>demanda de memoria</strong> se vuelve el cuello de botella, mucho antes que la CPU.</p>
 <p>Y la mayoría de esos hilos ni siquiera están trabajando: están <strong>bloqueados en una system call</strong> esperando la red o el disco. Mirá el timeline de una request sincrónica típica: <code>connect</code>, <code>write_all</code>, <code>read_to_string</code> — entre cada una, el hilo pasa la mayor parte del tiempo en <strong>waiting</strong>, sin poder hacer otra cosa.</p>
@@ -830,6 +853,7 @@ enum Poll&lt;T&gt; { Ready(T), Pending }</span>
       },
       {
         title: 'Sockets: el modelo cliente-servidor',
+        widget: 'sockets-detail',
         html: `
 <p>Los <strong>sockets</strong> permiten la comunicación entre dos procesos diferentes, ya sea en la misma máquina o en dos distintas. En el modelo cliente-servidor:</p>
 <ul>
@@ -923,32 +947,36 @@ let socket = TcpStream::connect("localhost:8080")?;</span>
 <p><strong>3 · Commit de dos fases</strong> — el de la sección siguiente.</p>`,
       },
       {
-        title: 'Control de concurrencia',
+        title: 'Control de concurrencia I: two-phase locking',
+        widget: 'twopl-detail',
         html: `
-<p>Controlar la concurrencia está relacionado con la sincronización y el <strong>ordenamiento</strong> de la ejecución de las transacciones, y con evitar deadlocks. Tres enfoques:</p>
-<p><strong>1 · Two-Phase Locking (2PL)</strong></p>
+<p>Controlar la concurrencia está relacionado con la sincronización y el <strong>ordenamiento</strong> de la ejecución de las transacciones, y con evitar deadlocks. El primer enfoque es el <strong>bloqueo</strong>:</p>
+<p><strong>Two-Phase Locking (2PL)</strong> — la transacción tiene dos fases y nunca vuelve atrás:</p>
 <ol>
 <li><strong>Fase de expansión</strong> (growing): se toman todos los locks a usar.</li>
-<li><strong>Fase de contracción</strong> (shrinking): se liberan todos los locks — <strong>no se pueden tomar nuevos locks</strong>.</li>
+<li><strong>Fase de contracción</strong> (shrinking): se liberan los locks — y <strong>ya no se pueden tomar nuevos</strong>.</li>
 </ol>
 <ul>
-<li><strong>Ventaja</strong>: garantiza la propiedad <em>serializable</em> para las transacciones.</li>
-<li><strong>Desventaja</strong>: pueden ocurrir <strong>deadlocks</strong>: si tengo transacciones distintas que están pidiendo un conjunto de locks ya tengo una gran chance de tener deadlocks.</li>
-<li><strong>Strict 2PL</strong>: variante donde la contracción ocurre <strong>después del commit</strong> de la transacción.</li>
-</ul>
-<p><strong>2 · Concurrencia optimista</strong> (el modelo de GitHub)</p>
-<p>Los cambios se hacen <strong>sin lockeos</strong>, porque se asume que no va a haber conflictos. El proceso modifica los archivos sin ningún control, esperando que no haya conflictos; al commitear <strong>se verifica</strong> si el resto de las transacciones modificó los mismos archivos y, si es así, <strong>se aborta la transacción</strong>.</p>
+<li><strong>Ventaja</strong>: garantiza la propiedad <em>serializable</em> para las transacciones. El punto donde termina de adquirir todo se llama <strong>locked point</strong>.</li>
+<li><strong>Desventaja</strong>: pueden ocurrir <strong>deadlocks</strong> — si dos transacciones distintas están pidiendo un conjunto de locks cruzados, hay una gran chance de trabarse.</li>
+<li><strong>Strict 2PL</strong>: variante donde la contracción ocurre <strong>después del commit</strong>. Evita que otra transacción lea datos que después se van a deshacer (dirty reads y abortos en cascada), a costa de retener los locks más tiempo.</li>
+</ul>`,
+      },
+      {
+        title: 'Control de concurrencia II: optimista y timestamps',
+        widget: 'optimistic-detail',
+        html: `
+<p><strong>Concurrencia optimista</strong> (el modelo de GitHub). Los cambios se hacen <strong>sin lockeos</strong>, porque se asume que no va a haber conflictos. El proceso modifica los archivos sin ningún control; al commitear <strong>se verifica</strong> si el resto de las transacciones modificó los mismos archivos y, si es así, <strong>se aborta la transacción</strong>.</p>
 <ul>
 <li><strong>Ventaja</strong>: libre de deadlocks, por lo que favorece el paralelismo.</li>
 <li><strong>Desventaja</strong>: rehacer todo puede ser costoso en condiciones de alta carga.</li>
 </ul>
-<p><strong>3 · Timestamps</strong></p>
-<p>Existen timestamps únicos globales para garantizar orden (ver algoritmo de <strong>relojes de Lamport</strong>). Cada archivo tiene dos timestamps: lectura y escritura, indicando qué transacción hizo la última operación en cada caso. Cada transacción recibe un timestamp al iniciarse, y se compara con los del archivo:</p>
+<p><strong>Timestamps</strong>. Existen timestamps únicos globales para garantizar orden (ver algoritmo de <strong>relojes de Lamport</strong>). Cada archivo tiene dos timestamps —lectura y escritura— indicando qué transacción hizo la última operación en cada caso. Cada transacción recibe un timestamp al iniciarse y se compara con los del archivo:</p>
 <ul>
 <li>Si es <strong>mayor</strong>, la transacción está en orden y se procede con la operación.</li>
 <li>Si es <strong>menor</strong>, la transacción <strong>se aborta</strong> (es más vieja que la última modificación del archivo).</li>
 </ul>
-<span class="tip">La concurrencia optimista conviene cuando hay una proporción mucho más grande de <strong>consultas que de modificaciones</strong>, porque no vamos a tener muchos casos donde se intenten editar los mismos archivos.</span>`,
+<span class="tip">La concurrencia optimista conviene cuando hay una proporción mucho más grande de <strong>consultas que de modificaciones</strong>, porque casi nunca se intentan editar los mismos archivos — y entonces casi nunca se paga el costo de rehacer.</span>`,
       },
       {
         title: 'Transacciones distribuidas: two-phase commit',
@@ -967,6 +995,7 @@ let socket = TcpStream::connect("localhost:8080")?;</span>
       },
       {
         title: 'Deadlock distribuido',
+        widget: 'waitgraph-detail',
         html: `
 <p>Con transacciones tomando locks en varios nodos, el deadlock reaparece — pero ahora <strong>nadie ve el grafo de espera completo</strong>: cada nodo conoce solo sus aristas. Estrategias:</p>
 <ul>
