@@ -20,14 +20,14 @@ const NET_EJ1: RNet = {
   placeIds: ['p1', 'p2', 'p3', 'p4', 'p5'],
   m0: [1, 0, 0, 0, 0],
   trans: [
-    { id: 't1', in: [1, 0, 0, 0, 0], out: [0, 1, 1, 0, 0], x: 50, y: 26 },
+    { id: 't1', in: [1, 0, 0, 0, 0], out: [0, 1, 1, 0, 0], x: 50, y: 28 },
     { id: 't2', in: [0, 1, 0, 0, 0], out: [0, 0, 0, 1, 0], x: 28, y: 58 },
     { id: 't3', in: [0, 0, 1, 0, 0], out: [0, 0, 0, 0, 1], x: 72, y: 58 },
-    { id: 't4', in: [0, 0, 0, 1, 0], out: [0, 1, 0, 0, 0], x: 10, y: 42 },
+    { id: 't4', in: [0, 0, 0, 1, 0], out: [0, 1, 0, 0, 0], x: 10, y: 52 },
     { id: 't5', in: [0, 0, 0, 1, 1], out: [1, 0, 0, 0, 0], x: 50, y: 90 },
   ],
   places: [
-    { x: 50, y: 8 },
+    { x: 50, y: 14 },
     { x: 28, y: 42 },
     { x: 72, y: 42 },
     { x: 28, y: 74 },
@@ -149,7 +149,7 @@ interface GEdge {
                 <rect [attr.x]="t.x - 1.5" [attr.y]="t.y - 4.6" width="3" height="9.2" rx="0.6"
                       [attr.fill]="enabled().includes(t.id) ? '#2ea043' : '#39445f'"
                       [attr.stroke]="enabled().includes(t.id) ? '#7ee787' : 'none'" stroke-width="0.6" />
-                <text [attr.x]="t.x" [attr.y]="t.y + 8.4" text-anchor="middle" font-size="3.2"
+                <text [attr.x]="t.x + 3" [attr.y]="t.y + 1.2" text-anchor="start" font-size="3.2"
                       [attr.fill]="enabled().includes(t.id) ? '#7ee787' : '#5c6a8e'">{{ t.id }}</text>
               </g>
             }
@@ -167,20 +167,20 @@ interface GEdge {
             </defs>
             @for (e of edges(); track $index) {
               <g>
-                <line [attr.x1]="ex(e, true)" [attr.y1]="ey(e, true)"
-                      [attr.x2]="ex(e, false)" [attr.y2]="ey(e, false)"
-                      class="gedge" marker-end="url(#garrow)" />
-                <text [attr.x]="(ex(e, true) + ex(e, false)) / 2 + 1.2"
-                      [attr.y]="(ey(e, true) + ey(e, false)) / 2 - 1"
-                      font-size="2.9" fill="#ffd54f">{{ e.label }}</text>
+                <path [attr.d]="edgeGeom(e).d" class="gedge" [class.back]="edgeGeom(e).back"
+                      marker-end="url(#garrow)" />
+                <text [attr.x]="edgeGeom(e).lx" [attr.y]="edgeGeom(e).ly"
+                      font-size="2.8" fill="#ffd54f">{{ e.label }}</text>
               </g>
             }
             @for (n of nodes(); track n.key) {
               <g>
-                <rect [attr.x]="n.x - 10" [attr.y]="n.y - 3.6" width="20" height="7.2" rx="2"
+                <rect [attr.x]="pos(n.key).x - boxW() / 2" [attr.y]="pos(n.key).y - 3.4"
+                      [attr.width]="boxW()" height="6.8" rx="2"
                       [attr.fill]="n.key === curKey() ? '#2a2a1a' : '#10151f'"
                       [attr.stroke]="n.key === curKey() ? '#ffd54f' : '#39445f'" stroke-width="0.7" />
-                <text [attr.x]="n.x" [attr.y]="n.y + 1.4" text-anchor="middle" font-size="3.4"
+                <text [attr.x]="pos(n.key).x" [attr.y]="pos(n.key).y + 1.2" text-anchor="middle"
+                      [attr.font-size]="boxW() < 17 ? 2.7 : 3.2"
                       [attr.fill]="n.key === curKey() ? '#ffd54f' : '#c8d0e4'" font-weight="700">
                   ({{ n.key }})
                 </text>
@@ -230,10 +230,13 @@ interface GEdge {
     .board { display: grid; grid-template-columns: 1fr 1.15fr; gap: 12px; }
     .arena { position: relative; min-height: 420px; background: radial-gradient(ellipse at 50% 45%, #202a40 0%, #171e2e 80%); border: 1px solid var(--border); border-radius: 10px; }
     .arena svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+    /* halo oscuro: aristas y arcos no tachan el texto */
+    .arena svg text { paint-order: stroke; stroke: #1b2336; stroke-width: 0.8px; stroke-linejoin: round; }
     .a-label { position: absolute; top: 6px; left: 10px; z-index: 2; font-size: 0.66rem; text-transform: uppercase; letter-spacing: 1px; color: #5c6a8e; font-weight: 700; }
     .arc { stroke: #5c6a8e; stroke-width: 0.35; }
     .tr { cursor: pointer; }
-    .gedge { stroke: #8b95b5; stroke-width: 0.35; }
+    .gedge { fill: none; stroke: #8b95b5; stroke-width: 0.35; }
+    .gedge.back { stroke-dasharray: 1.2 0.9; }
 
     .verdict { margin-top: 12px; background: rgba(46, 160, 67, 0.1); border: 1px solid #2ea043; border-radius: 10px; padding: 10px 14px; font-size: 0.88rem; line-height: 1.55; }
     .verdict.bad { background: rgba(239, 83, 80, 0.1); border-color: #ef5350; }
@@ -273,7 +276,7 @@ export class ReachDetail {
 
   private seedGraph(): void {
     const m0 = this.net().m0;
-    this.nodes.set([{ key: m0.join(','), marking: [...m0], depth: 0, x: 50, y: 12 }]);
+    this.nodes.set([{ key: m0.join(','), marking: [...m0], depth: 0, x: 0, y: 0 }]);
     this.edges.set([]);
     this.truncated.set(false);
   }
@@ -312,37 +315,92 @@ export class ReachDetail {
     return start ? f.y + ((t.y - f.y) / d) * f.r : t.y - ((t.y - f.y) / d) * t.r;
   }
 
-  /* --- geometría del grafo --- */
+  /* --- geometría del grafo: layout por capas (una fila por profundidad BFS) --- */
   private gNode(key: string): GNode | undefined {
     return this.nodes().find((n) => n.key === key);
   }
-  ex(e: GEdge, start: boolean): number {
-    const f = this.gNode(e.from)!;
-    const t = this.gNode(e.to)!;
-    const d = Math.hypot(t.x - f.x, t.y - f.y) || 1;
-    const r = 10.5;
-    return start ? f.x + ((t.x - f.x) / d) * r : t.x - ((t.x - f.x) / d) * r;
+
+  /** posición de cada marcado: filas por profundidad, repartidos parejo en cada fila */
+  readonly layout = computed(() => {
+    const ns = this.nodes();
+    const byDepth = new Map<number, GNode[]>();
+    for (const n of ns) {
+      if (!byDepth.has(n.depth)) byDepth.set(n.depth, []);
+      byDepth.get(n.depth)!.push(n);
+    }
+    const maxDepth = Math.max(0, ...ns.map((n) => n.depth));
+    // deja libre el pie (y > 92) para el cartel de "grafo infinito"
+    const dy = maxDepth === 0 ? 0 : Math.min(15, 75 / maxDepth);
+    const out = new Map<string, { x: number; y: number }>();
+    for (const [depth, row] of byDepth) {
+      row.forEach((n, k) => out.set(n.key, { x: ((k + 1) / (row.length + 1)) * 100, y: 12 + depth * dy }));
+    }
+    return out;
+  });
+
+  /** ancho de cada caja según la fila más poblada, para que nunca se toquen */
+  readonly boxW = computed(() => {
+    const counts = new Map<number, number>();
+    for (const n of this.nodes()) counts.set(n.depth, (counts.get(n.depth) ?? 0) + 1);
+    const widest = Math.max(1, ...counts.values());
+    return Math.min(20, 96 / (widest + 1) - 2);
+  });
+
+  pos(key: string): { x: number; y: number } {
+    return this.layout().get(key) ?? { x: 50, y: 12 };
   }
-  ey(e: GEdge, start: boolean): number {
-    const f = this.gNode(e.from)!;
-    const t = this.gNode(e.to)!;
-    const d = Math.hypot(t.x - f.x, t.y - f.y) || 1;
-    const r = 5;
-    return start ? f.y + ((t.y - f.y) / d) * r : t.y - ((t.y - f.y) / d) * r;
+
+  /** distancia desde el centro de una caja hasta su borde en la dirección (ux, uy) */
+  private boxReach(ux: number, uy: number): number {
+    const a = this.boxW() / 2 + 0.6;
+    const b = 4;
+    return 1 / Math.sqrt((ux / a) ** 2 + (uy / b) ** 2);
+  }
+
+  /**
+   * Geometría de una arista. Las que van hacia una capa igual o más profunda son rectas;
+   * las que vuelven a una capa anterior (ciclos) se curvan hacia un costado para no
+   * pasar por detrás de las cajas intermedias.
+   */
+  edgeGeom(e: GEdge): { d: string; lx: number; ly: number; back: boolean } {
+    const f = this.pos(e.from);
+    const t = this.pos(e.to);
+    const fd = this.gNode(e.from)?.depth ?? 0;
+    const td = this.gNode(e.to)?.depth ?? 0;
+    const back = td < fd;
+
+    // punto de control: medio del segmento, o desplazado al costado si es arista de vuelta
+    let cx = (f.x + t.x) / 2;
+    const cy = (f.y + t.y) / 2;
+    if (back) {
+      const dir = f.x + t.x >= 100 ? 1 : -1; // hacia el lado donde ya están los nodos
+      cx = Math.max(3, Math.min(97, cx + dir * (12 + 4 * (fd - td))));
+    }
+
+    const clip = (p: { x: number; y: number }, q: { x: number; y: number }) => {
+      const d = Math.hypot(q.x - p.x, q.y - p.y) || 1;
+      const ux = (q.x - p.x) / d;
+      const uy = (q.y - p.y) / d;
+      const r = this.boxReach(ux, uy);
+      return { x: p.x + ux * r, y: p.y + uy * r };
+    };
+    const c = { x: cx, y: cy };
+    const s = clip(f, back ? c : t);
+    const en = clip(t, back ? c : f);
+    const d = back
+      ? `M ${s.x.toFixed(1)} ${s.y.toFixed(1)} Q ${c.x.toFixed(1)} ${c.y.toFixed(1)} ${en.x.toFixed(1)} ${en.y.toFixed(1)}`
+      : `M ${s.x.toFixed(1)} ${s.y.toFixed(1)} L ${en.x.toFixed(1)} ${en.y.toFixed(1)}`;
+    // etiqueta: sobre la curva (punto medio de la cuadrática) o al 40% de la recta
+    const lx = back ? 0.25 * s.x + 0.5 * c.x + 0.25 * en.x + 0.8 : s.x + (en.x - s.x) * 0.4 + 1;
+    const ly = back ? 0.25 * s.y + 0.5 * c.y + 0.25 * en.y : s.y + (en.y - s.y) * 0.4;
+    return { d, lx, ly, back };
   }
 
   private addNode(marking: number[], depth: number): GNode {
     const key = marking.join(',');
     const existing = this.gNode(key);
     if (existing) return existing;
-    const atDepth = this.nodes().filter((n) => n.depth === depth).length;
-    const node: GNode = {
-      key,
-      marking: [...marking],
-      depth,
-      x: 18 + ((atDepth * 26 + depth * 9) % 70),
-      y: Math.min(12 + depth * 15, 90),
-    };
+    const node: GNode = { key, marking: [...marking], depth, x: 0, y: 0 };
     this.nodes.update((ns) => [...ns, node]);
     return node;
   }

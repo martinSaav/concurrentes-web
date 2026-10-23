@@ -242,7 +242,14 @@ const PY = [16, 74, 82, 74];
     @media (max-width: 720px) {
       .board { flex-direction: column; }
       .side { width: 100%; }
-      .cnode, .pnode { width: 150px; }
+      .arena { min-height: 470px; }
+      /* en pantalla angosta: tres columnas que no se pisan (17% / 50% / 83% ± 15%) */
+      .cnode { width: 62%; }
+      .pnode { width: 30%; padding: 6px; }
+      .n-name { font-size: 0.72rem; }
+      .n-state { font-size: 0.6rem; }
+      .pbtns { flex-direction: column; }
+      .pb { padding: 4px 2px; }
     }
   `,
 })

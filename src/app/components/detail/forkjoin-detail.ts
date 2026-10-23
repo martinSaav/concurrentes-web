@@ -245,7 +245,8 @@ export class ForkjoinDetail extends SteppedAnim implements OnDestroy {
   }
 
   readonly visibleNodes = computed(() => {
-    const i = this.curIndex();
+    // antes de arrancar se muestra el array inicial (raíz), no un canvas vacío
+    const i = Math.max(this.curIndex(), 0);
     return NODES.filter((n) => n.appears <= i);
   });
 
