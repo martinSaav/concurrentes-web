@@ -62,29 +62,30 @@ const STRICT: Op[] = [
       </div>
 
       <div class="chart">
-        <svg viewBox="0 0 100 46" preserveAspectRatio="none">
-          <!-- grilla -->
-          @for (l of [0, 1, 2, 3]; track l) {
-            <line x1="7" [attr.y1]="yFor(l)" x2="99" [attr.y2]="yFor(l)" class="grid" />
-          }
-          <!-- área bajo la curva -->
-          <path [attr.d]="areaPath()" class="area" />
-          <!-- curva escalonada -->
-          <path [attr.d]="linePath()" class="line" />
-          <!-- marcador del paso actual -->
+        <!-- el SVG se estira (preserveAspectRatio none) así que solo lleva trazos;
+             textos y el punto van en HTML posicionado en %, para no deformarse -->
+        <div class="plot">
+          <svg viewBox="0 0 100 46" preserveAspectRatio="none">
+            @for (l of [0, 1, 2, 3]; track l) {
+              <line x1="7" [attr.y1]="yFor(l)" x2="99" [attr.y2]="yFor(l)" class="grid" />
+            }
+            <path [attr.d]="areaPath()" class="area" />
+            <path [attr.d]="linePath()" class="line" />
+            @if (cur() >= 0) {
+              <line [attr.x1]="xFor(cur())" y1="2" [attr.x2]="xFor(cur())" y2="38" class="cursor" />
+            }
+          </svg>
           @if (cur() >= 0) {
-            <line [attr.x1]="xFor(cur())" y1="2" [attr.x2]="xFor(cur())" y2="38" class="cursor" />
-            <circle [attr.cx]="xFor(cur())" [attr.cy]="yFor(ops()[cur()].locks)" r="1.4" class="pt" />
+            <span class="pt" [style.left.%]="xFor(cur())" [style.top.%]="pctY(yFor(ops()[cur()].locks))"></span>
           }
-          <!-- locked point -->
           @if (peakIdx() >= 0) {
-            <text [attr.x]="xFor(peakIdx())" y="4.4" text-anchor="middle" class="peak-t">locked point</text>
+            <span class="peak-t" [style.left.%]="xFor(peakIdx())" [style.top.%]="pctY(yFor(3)) - 8">locked point</span>
           }
-          <!-- eje y -->
           @for (l of [0, 1, 2, 3]; track l) {
-            <text x="5" [attr.y]="yFor(l) + 1.2" text-anchor="end" class="ax">{{ l }}</text>
+            <span class="ax" [style.top.%]="pctY(yFor(l))">{{ l }}</span>
           }
-        </svg>
+          <span class="ax-title">locks</span>
+        </div>
 
         <!-- etiquetas de operaciones -->
         <div class="oplabels">
@@ -125,14 +126,16 @@ const STRICT: Op[] = [
     .mode.on { background: #1f6feb; color: #fff; }
 
     .chart { background: radial-gradient(ellipse at 50% 45%, #202a40 0%, #171e2e 80%); border: 1px solid var(--border); border-radius: 10px; padding: 10px; }
-    svg { width: 100%; height: 190px; display: block; }
+    .plot { position: relative; height: 190px; }
+    svg { width: 100%; height: 100%; display: block; }
+    .pt { position: absolute; width: 10px; height: 10px; border-radius: 50%; background: #ffd54f; transform: translate(-50%, -50%); box-shadow: 0 0 8px rgba(255, 213, 79, 0.6); }
+    .peak-t { position: absolute; transform: translate(-50%, -100%); color: #ffab70; font-size: 0.72rem; font-weight: 700; white-space: nowrap; }
+    .ax { position: absolute; left: 2%; transform: translateY(-50%); color: #5c6a8e; font-size: 0.66rem; font-family: Consolas, monospace; }
+    .ax-title { position: absolute; left: 0; top: 0; color: #5c6a8e; font-size: 0.6rem; text-transform: uppercase; letter-spacing: 1px; }
     .grid { stroke: #232b3e; stroke-width: 0.3; vector-effect: non-scaling-stroke; }
     .area { fill: rgba(88, 166, 255, 0.14); }
     .line { fill: none; stroke: #58a6ff; stroke-width: 2; vector-effect: non-scaling-stroke; }
     .cursor { stroke: #ffd54f; stroke-width: 1.4; stroke-dasharray: 2 2; vector-effect: non-scaling-stroke; }
-    .pt { fill: #ffd54f; }
-    .ax { fill: #5c6a8e; font-size: 3px; font-family: Consolas, monospace; }
-    .peak-t { fill: #ffab70; font-size: 3px; font-weight: 700; }
 
     .oplabels { display: flex; gap: 3px; margin-top: 8px; flex-wrap: wrap; }
     .op { flex: 1; min-width: 52px; background: var(--panel-2); border: 1px solid var(--border); color: var(--text-dim); border-radius: 5px; padding: 4px 3px; font-size: 0.62rem; font-family: Consolas, monospace; cursor: pointer; }
@@ -192,6 +195,10 @@ export class TwoplDetail extends SteppedAnim implements OnDestroy {
   }
   yFor(locks: number): number {
     return 38 - (locks / 3) * 32;
+  }
+  /** y del viewBox (0..46) a % del alto del gráfico, para los overlays HTML */
+  pctY(y: number): number {
+    return (y / 46) * 100;
   }
 
   readonly linePath = computed(() => {

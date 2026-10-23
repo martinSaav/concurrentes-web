@@ -208,8 +208,10 @@ const COLORS = ['#58a6ff', '#7ee787', '#ffd54f', '#f0883e'];
     .met-note { flex: 1; min-width: 220px; font-size: 0.76rem; color: var(--text-dim); line-height: 1.5; align-self: center; }
     .met-note strong { color: var(--text); }
 
+    .rl { white-space: nowrap; }
     @media (max-width: 720px) {
-      .row, .axis { grid-template-columns: 40px 1fr; }
+      .row, .axis { grid-template-columns: 46px 1fr; }
+      .rl { font-size: 0.62rem; }
     }
   `,
 })

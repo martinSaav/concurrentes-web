@@ -137,7 +137,7 @@ const STEPS: SockStep[] = [
       </div>
 
       <div class="canvas">
-        <svg viewBox="0 0 100 100">
+        <svg viewBox="0 0 160 100">
           <defs>
             <marker id="sarrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
               <path d="M0,0 L6,3 L0,6 z" fill="#8b95b5" />
@@ -145,26 +145,26 @@ const STEPS: SockStep[] = [
           </defs>
 
           <!-- encabezados -->
-          <text x="20" y="3.4" text-anchor="middle" class="colhead cli">💻 CLIENTE (activo)</text>
-          <text x="80" y="3.4" text-anchor="middle" class="colhead srv">🖥 SERVIDOR (pasivo)</text>
+          <text x="36" y="3.4" text-anchor="middle" class="colhead cli">💻 CLIENTE (activo)</text>
+          <text x="124" y="3.4" text-anchor="middle" class="colhead srv">🖥 SERVIDOR (pasivo)</text>
 
           <!-- líneas de vida -->
-          <line x1="20" y1="5" x2="20" y2="98" class="life" />
-          <line x1="80" y1="5" x2="80" y2="98" class="life" />
+          <line x1="36" y1="5" x2="36" y2="98" class="life" />
+          <line x1="124" y1="5" x2="124" y2="98" class="life" />
 
           <!-- zona de conexión establecida -->
           @if (established()) {
-            <rect x="22" y="55" width="56" height="24" class="estab" />
-            <text x="50" y="58.5" text-anchor="middle" class="estab-t">conexión establecida</text>
+            <rect x="54" y="55" width="52" height="24" class="estab" />
+            <text x="80" y="58.5" text-anchor="middle" class="estab-t">conexión establecida</text>
           }
 
           <!-- cajas del servidor -->
           @for (b of server; track b.id) {
             <g>
-              <rect x="64" [attr.y]="b.y" width="32" height="7" rx="1.2"
+              <rect x="108" [attr.y]="b.y" width="32" height="7" rx="1.2"
                     class="box" [class.on]="isActive(b.id)" [class.past]="isDone(b.id)"
                     [class.blk]="b.blocking" />
-              <text x="80" [attr.y]="b.y + 4.6" text-anchor="middle" class="bl"
+              <text x="124" [attr.y]="b.y + 4.6" text-anchor="middle" class="bl"
                     [class.on-t]="isActive(b.id)">{{ b.label }}</text>
             </g>
           }
@@ -172,10 +172,10 @@ const STEPS: SockStep[] = [
           <!-- cajas del cliente -->
           @for (b of client; track b.id) {
             <g>
-              <rect x="4" [attr.y]="b.y" width="32" height="7" rx="1.2"
+              <rect x="20" [attr.y]="b.y" width="32" height="7" rx="1.2"
                     class="box" [class.on]="isActive(b.id)" [class.past]="isDone(b.id)"
                     [class.blk]="b.blocking" />
-              <text x="20" [attr.y]="b.y + 4.6" text-anchor="middle" class="bl"
+              <text x="36" [attr.y]="b.y + 4.6" text-anchor="middle" class="bl"
                     [class.on-t]="isActive(b.id)">{{ b.label }}</text>
             </g>
           }
@@ -184,11 +184,11 @@ const STEPS: SockStep[] = [
           @for (a of arrows(); track $index) {
             <g>
               <line
-                [attr.x1]="a.dir === 'c2s' ? 37 : 63" [attr.y1]="a.y"
-                [attr.x2]="a.dir === 'c2s' ? 63 : 37" [attr.y2]="a.y"
+                [attr.x1]="a.dir === 'c2s' ? 53 : 107" [attr.y1]="a.y"
+                [attr.x2]="a.dir === 'c2s' ? 107 : 53" [attr.y2]="a.y"
                 class="msg" [class.hs]="a.kind === 'hs'" [class.data]="a.kind === 'data'"
                 [class.close]="a.kind === 'close'" marker-end="url(#sarrow)" />
-              <text x="50" [attr.y]="a.y - 1.4" text-anchor="middle" class="msgl">{{ a.label }}</text>
+              <text x="80" [attr.y]="a.y - 1.4" text-anchor="middle" class="msgl">{{ a.label }}</text>
             </g>
           }
         </svg>
@@ -226,7 +226,12 @@ const STEPS: SockStep[] = [
     .spd.on { background: #1f6feb; color: #fff; font-weight: 700; }
 
     .canvas { background: radial-gradient(ellipse at 50% 45%, #202a40 0%, #171e2e 80%); border: 1px solid var(--border); border-radius: 10px; padding: 8px; }
-    svg { width: 100%; height: auto; display: block; min-height: 420px; }
+    svg { width: 100%; height: auto; display: block; max-height: 600px; }
+    @media (max-width: 720px) {
+      /* en móvil conserva un ancho legible y se scrollea dentro del canvas */
+      .canvas { overflow-x: auto; }
+      svg { min-width: 560px; }
+    }
 
     .colhead { font-size: 2.7px; font-weight: 800; }
     .colhead.cli { fill: #58a6ff; }

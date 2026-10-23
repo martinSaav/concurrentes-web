@@ -442,6 +442,8 @@ const NETS = [NET_MUTEX, NET_PRODCONS, NET_CLISERV, NET_RW, NET_INHIB, NET_BARBE
     .arena { position: relative; flex: 1; min-height: 560px; background: radial-gradient(ellipse at 50% 45%, #202a40 0%, #171e2e 80%); border: 1px solid var(--border); border-radius: 10px; transition: border-color 0.3s; }
     .arena.dead { border-color: #ef5350; }
     .arena svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+    /* halo oscuro: los arcos que pasan por detrás no tachan las etiquetas */
+    .arena svg text { paint-order: stroke; stroke: #1b2336; stroke-width: 0.9px; stroke-linejoin: round; }
     .arc { fill: none; stroke: #5c6a8e; stroke-width: 0.35; }
     .arc.inh { stroke: #ef9a9a; stroke-dasharray: 1.2 1.2; }
     .tr { cursor: pointer; }

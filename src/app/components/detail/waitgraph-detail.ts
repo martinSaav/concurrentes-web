@@ -107,12 +107,6 @@ const PRESETS: Record<string, Edge[]> = {
               </g>
             }
           </svg>
-
-          @if (cycle().length > 0) {
-            <div class="banner">
-              💀 CICLO: {{ cycleLabel() }} — <strong>deadlock</strong>
-            </div>
-          }
         </div>
 
         <div class="side">
@@ -150,6 +144,10 @@ const PRESETS: Record<string, Edge[]> = {
         </div>
       </div>
 
+      @if (cycle().length > 0) {
+        <div class="banner">💀 CICLO: {{ cycleLabel() }} — <strong>deadlock</strong></div>
+      }
+
       <div class="status" [class.idle]="!msg()">
         @if (msg(); as m) {
           <span [innerHTML]="m"></span>
@@ -180,7 +178,7 @@ const PRESETS: Record<string, Edge[]> = {
     .edge { stroke: #5c6a8e; stroke-width: 0.45; }
     .edge.wait { stroke-dasharray: 1.6 1.2; }
     .edge.incyc { stroke: #ef5350; stroke-width: 0.75; }
-    .banner { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); background: rgba(8, 12, 22, 0.95); border: 1.5px solid #ef5350; color: #ef9a9a; border-radius: 9px; padding: 5px 14px; font-size: 0.76rem; font-weight: 700; white-space: nowrap; }
+    .banner { margin-top: 12px; background: rgba(239, 83, 80, 0.1); border: 1px solid #ef5350; color: #ef9a9a; border-radius: 10px; padding: 9px 14px; font-size: 0.86rem; font-weight: 700; text-align: center; }
 
     .side { width: 236px; flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; }
     .panel { background: #10151f; border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; }

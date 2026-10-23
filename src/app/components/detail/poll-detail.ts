@@ -164,6 +164,7 @@ const STEPS: PollStep[] = [
     .spd.on { background: #1f6feb; color: #fff; font-weight: 700; }
 
     .board { display: grid; grid-template-columns: 1.15fr 1fr; gap: 12px; align-items: start; }
+    .board > * { min-width: 0; } /* sin esto el código largo ensancha la columna del grid */
     .codepanel { background: #0b0f19; border: 1px solid var(--border); border-radius: 10px; padding: 10px; }
     .cp-head { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 1px; color: #5c6a8e; font-weight: 700; margin-bottom: 8px; }
     .cline { font-family: Consolas, monospace; font-size: 0.72rem; padding: 3px 8px; border-radius: 5px; color: #8b95b5; white-space: pre; overflow-x: auto; }

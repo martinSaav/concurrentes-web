@@ -122,7 +122,7 @@ type Mode = 'none' | 'shared' | 'private';
     .slider input { accent-color: var(--accent); width: 90px; }
 
     .canvas { background: radial-gradient(ellipse at 50% 45%, #202a40 0%, #171e2e 80%); border: 1px solid var(--border); border-radius: 10px; padding: 8px; }
-    svg { width: 100%; height: auto; display: block; }
+    svg { width: 100%; max-width: 640px; height: auto; display: block; margin: 0 auto; }
 
     .proc { fill: #10151f; stroke: #39445f; stroke-width: 0.4; }
     .cell { stroke-width: 0.35; transition: fill 0.25s, stroke 0.25s; }

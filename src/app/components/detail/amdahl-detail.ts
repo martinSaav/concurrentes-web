@@ -39,7 +39,7 @@ import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/c
             <text [attr.x]="xPos(gx)" [attr.y]="H - PAD_B + 14" text-anchor="middle" class="tick">{{ gx }}</text>
           }
           <text [attr.x]="(PAD + W) / 2" [attr.y]="H - 4" text-anchor="middle" class="axis">procesadores (escala log)</text>
-          <text [attr.x]="12" [attr.y]="(H - PAD_B) / 2" text-anchor="middle" class="axis" [attr.transform]="'rotate(-90 12 ' + (H - PAD_B) / 2 + ')'">speedup</text>
+          <text [attr.x]="12" [attr.y]="(H - PAD_B) / 2" text-anchor="middle" class="axis" [attr.transform]="'rotate(-90 12 ' + (H - PAD_B) / 2 + ')'">speedup (escala log)</text>
 
           <!-- ideal S = N -->
           <polyline [attr.points]="idealPts()" class="ideal" />
@@ -92,12 +92,13 @@ import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/c
     .caption { color: var(--text-dim); font-size: 0.85rem; margin-top: 2px; }
 
     .sliders { display: flex; gap: 26px; flex-wrap: wrap; margin-bottom: 12px; }
-    .sliders label { display: flex; align-items: center; gap: 10px; font-size: 0.84rem; color: var(--text-dim); }
+    .sliders label { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 0.84rem; color: var(--text-dim); max-width: 100%; }
     .sliders strong { color: #ffd54f; font-family: Consolas, monospace; min-width: 42px; display: inline-block; }
-    .sliders input { accent-color: var(--accent); width: 180px; }
+    .sliders input { accent-color: var(--accent); width: 180px; max-width: 100%; }
 
-    .chartwrap { background: #10151f; border: 1px solid var(--border); border-radius: 10px; padding: 6px; }
-    svg { width: 100%; height: auto; display: block; }
+    /* en pantallas angostas el gráfico conserva un ancho legible y se scrollea adentro */
+    .chartwrap { background: #10151f; border: 1px solid var(--border); border-radius: 10px; padding: 6px; overflow-x: auto; }
+    svg { width: 100%; min-width: 520px; height: auto; display: block; }
     .grid { stroke: #232b3e; stroke-width: 1; }
     .tick { fill: #5c6a8e; font-size: 10px; font-family: Consolas, monospace; }
     .axis { fill: #9aa4bf; font-size: 10px; }
@@ -169,8 +170,9 @@ export class AmdahlDetail {
     const t = Math.log2(nn) / 6; // 1..64 → 0..1
     return this.PAD + t * (this.W - 12 - this.PAD);
   }
+  /** eje y en escala log2, igual que el x: el ideal S=N queda como diagonal recta */
   yPos(sp: number): number {
-    const t = sp / this.yMax();
+    const t = Math.log2(Math.max(sp, 1)) / Math.log2(this.yMax());
     return this.H - this.PAD_B - t * (this.H - this.PAD_B - 12);
   }
 
