@@ -26,7 +26,9 @@ export interface Topic {
     | 'workstealing-detail'
     | 'arc-detail'
     | 'twopl-detail'
-    | 'optimistic-detail'; // componentes a medida
+    | 'optimistic-detail'
+    | 'lamport-detail'
+    | 'ricart-detail'; // componentes a medida
 }
 
 export interface Section {
@@ -870,6 +872,27 @@ let socket = TcpStream::connect("localhost:8080")?;</span>
 <span class="warn">El <strong>cierre de conexión en TCP es unilateral</strong>: cualquiera de los dos extremos puede enviar un mensaje de cierre, y cada parte decide cerrar la conexión de su lado. Por eso se hace close → se recibe close ACK ← se envía close ← y se envía un último ACK →. En Rust, la conexión se cierra cuando el <code>TcpStream</code> se dropea (<code>shutdown()</code> permite cerrar solo escritura, solo lectura, o ambas).</span>`,
       },
       {
+        title: 'Relojes lógicos de Lamport',
+        widget: 'lamport-detail',
+        html: `
+<p>En un sistema distribuido <strong>no hay reloj global</strong>: cada máquina tiene el suyo y nunca coinciden exactamente. Si ordenamos eventos por la hora local de cada uno, puede pasar algo absurdo: <strong>un mensaje que se recibe "antes" de haber sido enviado</strong>.</p>
+<p>La idea de Lamport: no hace falta saber <em>qué hora es</em>, alcanza con que todos coincidan en el <strong>orden</strong> de los eventos que se pueden relacionar. Para eso define la relación <strong>happened-before</strong> (<span class="formula">a → b</span>, "a ocurrió antes que b"):</p>
+<ul>
+<li>Si a y b son eventos del <strong>mismo proceso</strong> y a ocurre primero → <span class="formula">a → b</span>.</li>
+<li>Si a es el <strong>envío</strong> de un mensaje y b su <strong>recepción</strong> → <span class="formula">a → b</span>.</li>
+<li>Es <strong>transitiva</strong>: si a → b y b → c, entonces a → c.</li>
+<li>Si ni a → b ni b → a, los eventos son <strong>concurrentes</strong>: no se puede decir cuál fue primero, y no importa.</li>
+</ul>
+<p>Cada proceso mantiene un contador <strong>C</strong> y aplica tres reglas:</p>
+<ol>
+<li>Antes de cada evento local, <strong>incrementa</strong> su contador: <span class="formula">C = C + 1</span>.</li>
+<li>Al <strong>enviar</strong> un mensaje, le adjunta su valor de C como <strong>timestamp</strong>.</li>
+<li>Al <strong>recibir</strong> un mensaje con timestamp ts: <span class="formula">C = max(C, ts) + 1</span>. Si su reloj venía atrasado, lo adelanta.</li>
+</ol>
+<p>Con eso se garantiza la <strong>condición de reloj</strong>: si <span class="formula">a → b</span> entonces <span class="formula">C(a) &lt; C(b)</span>. Para tener un <strong>orden total</strong> (que dos eventos nunca empaten), se desempata por número de proceso: el par <span class="formula">(C, id)</span>. Esto es lo que usan Ricart-Agrawala, los timestamps de transacciones y wait-die / wound-wait.</p>
+<span class="warn">La implicación va en un solo sentido. <span class="formula">C(a) &lt; C(b)</span> <strong>NO</strong> implica que a → b: los dos eventos pueden ser concurrentes y haber recibido números distintos por casualidad. Lamport garantiza que la causalidad se respeta, no que se pueda deducir a partir de los números.</span>`,
+      },
+      {
         title: 'Exclusión mutua distribuida',
         widget: 'distmutex-detail',
         html: `
@@ -877,7 +900,7 @@ let socket = TcpStream::connect("localhost:8080")?;</span>
 <ul>
 <li><strong>Centralizado</strong> (<code>centralizedmutex.rs</code>): un coordinador con una cola. REQUEST → GRANT → RELEASE: solo <strong>3 mensajes por acceso</strong>, orden justo. Contras: cuello de botella y <strong>single point of failure</strong>.</li>
 <li><strong>Token ring</strong> (<code>tokenring.rs</code>): un único <strong>token</strong> circula por el anillo; solo su portador entra a la CS. No hay coordinador ni starvation (el token pasa por todos). Contras: mensajes constantes aunque nadie quiera entrar, y si el portador muere hay que <strong>detectar y regenerar el token</strong> (garantizando que no queden dos).</li>
-<li><strong>Distribuido (Ricart-Agrawala)</strong>: no requiere líder. Cuando un proceso quiere entrar, <strong>broadcastea</strong> un mensaje con el nombre de la sección crítica, su número de proceso y un <strong>timestamp</strong>. Al recibirlo: <em>(1)</em> si el receptor no está en la CS y no quiere entrar, envía OK; <em>(2)</em> si está en la CS, no responde y <strong>encola</strong> el pedido; <em>(3)</em> si también quiere entrar, compara timestamps y <strong>gana el menor</strong> (el que decidió antes). Al salir de la CS, envía OK a todos los que encoló.</li>
+<li><strong>Distribuido (Ricart-Agrawala)</strong>: no requiere líder; cada proceso le pide permiso a todos los demás usando timestamps de Lamport. Está desarrollado con su animación en el tema siguiente.</li>
 </ul>
 <p><strong>Comparación</strong> (el resumen de la cátedra):</p>
 <div class="tablewrap"><table>
@@ -888,6 +911,26 @@ let socket = TcpStream::connect("localhost:8080")?;</span>
 </table></div>
 <p><strong>El algoritmo centralizado es el más simple y el más eficiente.</strong> El distribuido reemplaza el single point of failure por <em>n</em> points of failure: si algún proceso cae, su silencio se interpreta incorrectamente como una <strong>denegación de permiso</strong>, bloqueando todos los intentos posteriores de entrar a la sección crítica.</p>
 <span class="warn">"¿El token ring garantiza exclusión mutua?" Sí, trivialmente: hay UN token. Las preguntas con trampa son las de fallas: ¿qué pasa si se pierde el token? ¿y si por un bug de regeneración aparecen dos?</span>`,
+      },
+      {
+        title: 'Ricart-Agrawala: exclusión mutua con timestamps',
+        widget: 'ricart-detail',
+        html: `
+<p>El algoritmo <strong>distribuido</strong> de exclusión mutua: no hay coordinador ni token. Para entrar a la sección crítica, un proceso arma un mensaje con el <strong>nombre de la sección crítica</strong>, su <strong>número de proceso</strong> y su <strong>timestamp</strong> de Lamport, y lo <strong>broadcastea</strong> a todos. Entra recién cuando recibió <strong>OK de los n − 1 restantes</strong>.</p>
+<p>Al recibir un pedido, cada proceso aplica una de tres reglas:</p>
+<ol>
+<li><strong>No está en la sección crítica y no quiere entrar</strong> → responde OK.</li>
+<li><strong>Está en la sección crítica</strong> → no responde y <strong>encola</strong> el pedido.</li>
+<li><strong>También quiere entrar</strong> → compara su timestamp con el del mensaje y <strong>gana el menor</strong>. Si el del otro es menor, le responde OK; si el suyo es menor, no responde y lo encola.</li>
+</ol>
+<p>Al salir de la sección crítica, manda OK a <strong>todos los que tenía encolados</strong> y los borra de la cola.</p>
+<p><strong>¿Por qué gana el timestamp menor?</strong> Es el proceso que pidió primero. Estadísticamente lleva más trabajo hecho, y no queremos que espere bloqueado: se prefiere que termine antes. Además, como el timestamp más viejo siempre termina ganando, no hay <strong>starvation</strong>.</p>
+<ul>
+<li><strong>Ventaja</strong>: garantiza la exclusión mutua <strong>sin deadlock ni starvation</strong>, y sin un líder del que depender.</li>
+<li><strong>Costo</strong>: <span class="formula">2(n − 1)</span> mensajes por acceso (n − 1 pedidos + n − 1 OKs), contra los 3 del centralizado.</li>
+<li><strong>Desventajas</strong>: el single point of failure se convierte en <strong>n points of failure</strong>. Si un proceso cae, nunca responde, y su silencio se interpreta como denegación: nadie más entra. Se puede mitigar respondiendo siempre, tanto para conceder como para denegar, y tratando el timeout como "el destinatario está caído". También exige que cada proceso conozca la lista de miembros del grupo (los que entran, los que salen y los que se cayeron), y todos participan en cada decisión, así que se vuelve un cuello de botella.</li>
+</ul>
+<span class="tip">Conviene implementarlo sobre <strong>UDP</strong>: con TCP habría que mantener conexiones abiertas entre cada par de procesos. Y aunque es "totalmente distribuido", termina siendo peor que el centralizado en mensajes y en tolerancia a fallas. Es un algoritmo para entender la idea, no para producción.</span>`,
       },
       {
         title: 'Elección de líder: anillo y bully',

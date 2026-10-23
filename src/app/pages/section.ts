@@ -26,6 +26,8 @@ import { WorkstealingDetail } from '../components/detail/workstealing-detail';
 import { ArcDetail } from '../components/detail/arc-detail';
 import { TwoplDetail } from '../components/detail/twopl-detail';
 import { OptimisticDetail } from '../components/detail/optimistic-detail';
+import { LamportDetail } from '../components/detail/lamport-detail';
+import { RicartDetail } from '../components/detail/ricart-detail';
 
 @Component({
   selector: 'app-section',
@@ -57,6 +59,8 @@ import { OptimisticDetail } from '../components/detail/optimistic-detail';
     ArcDetail,
     TwoplDetail,
     OptimisticDetail,
+    LamportDetail,
+    RicartDetail,
   ],
   template: `
     @if (section(); as sec) {
@@ -103,6 +107,8 @@ import { OptimisticDetail } from '../components/detail/optimistic-detail';
               @case ('arc-detail') { <app-arc-detail /> }
               @case ('twopl-detail') { <app-twopl-detail /> }
               @case ('optimistic-detail') { <app-optimistic-detail /> }
+              @case ('lamport-detail') { <app-lamport-detail /> }
+              @case ('ricart-detail') { <app-ricart-detail /> }
             }
           </article>
         }
