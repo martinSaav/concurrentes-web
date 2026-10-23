@@ -19,6 +19,14 @@ import { DistmutexDetail } from '../components/detail/distmutex-detail';
 import { PetriDetail } from '../components/detail/petri-detail';
 import { ReachDetail } from '../components/detail/reach-detail';
 import { MemoryDetail } from '../components/detail/memory-detail';
+import { TimelineDetail } from '../components/detail/timeline-detail';
+import { SocketsDetail } from '../components/detail/sockets-detail';
+import { WaitgraphDetail } from '../components/detail/waitgraph-detail';
+import { BarrierDetail } from '../components/detail/barrier-detail';
+import { WorkstealingDetail } from '../components/detail/workstealing-detail';
+import { ArcDetail } from '../components/detail/arc-detail';
+import { TwoplDetail } from '../components/detail/twopl-detail';
+import { OptimisticDetail } from '../components/detail/optimistic-detail';
 
 @Component({
   selector: 'app-section',
@@ -43,6 +51,14 @@ import { MemoryDetail } from '../components/detail/memory-detail';
     PetriDetail,
     ReachDetail,
     MemoryDetail,
+    TimelineDetail,
+    SocketsDetail,
+    WaitgraphDetail,
+    BarrierDetail,
+    WorkstealingDetail,
+    ArcDetail,
+    TwoplDetail,
+    OptimisticDetail,
   ],
   template: `
     @if (section(); as sec) {
@@ -82,6 +98,14 @@ import { MemoryDetail } from '../components/detail/memory-detail';
               @case ('petri-detail') { <app-petri-detail /> }
               @case ('reach-detail') { <app-reach-detail /> }
               @case ('memory-detail') { <app-memory-detail /> }
+              @case ('timeline-detail') { <app-timeline-detail /> }
+              @case ('sockets-detail') { <app-sockets-detail /> }
+              @case ('waitgraph-detail') { <app-waitgraph-detail /> }
+              @case ('barrier-detail') { <app-barrier-detail /> }
+              @case ('workstealing-detail') { <app-workstealing-detail /> }
+              @case ('arc-detail') { <app-arc-detail /> }
+              @case ('twopl-detail') { <app-twopl-detail /> }
+              @case ('optimistic-detail') { <app-optimistic-detail /> }
             }
           </article>
         }
