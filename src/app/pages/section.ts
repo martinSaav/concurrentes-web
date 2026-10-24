@@ -28,6 +28,9 @@ import { TwoplDetail } from '../components/detail/twopl-detail';
 import { OptimisticDetail } from '../components/detail/optimistic-detail';
 import { LamportDetail } from '../components/detail/lamport-detail';
 import { RicartDetail } from '../components/detail/ricart-detail';
+import { WaitdieDetail } from '../components/detail/waitdie-detail';
+import { SimdDetail } from '../components/detail/simd-detail';
+import { GpuDetail } from '../components/detail/gpu-detail';
 
 @Component({
   selector: 'app-section',
@@ -61,6 +64,9 @@ import { RicartDetail } from '../components/detail/ricart-detail';
     OptimisticDetail,
     LamportDetail,
     RicartDetail,
+    WaitdieDetail,
+    SimdDetail,
+    GpuDetail,
   ],
   template: `
     @if (section(); as sec) {
@@ -109,6 +115,9 @@ import { RicartDetail } from '../components/detail/ricart-detail';
               @case ('optimistic-detail') { <app-optimistic-detail /> }
               @case ('lamport-detail') { <app-lamport-detail /> }
               @case ('ricart-detail') { <app-ricart-detail /> }
+              @case ('waitdie-detail') { <app-waitdie-detail /> }
+              @case ('simd-detail') { <app-simd-detail /> }
+              @case ('gpu-detail') { <app-gpu-detail /> }
             }
           </article>
         }
