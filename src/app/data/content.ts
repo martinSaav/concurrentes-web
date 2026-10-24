@@ -28,7 +28,10 @@ export interface Topic {
     | 'twopl-detail'
     | 'optimistic-detail'
     | 'lamport-detail'
-    | 'ricart-detail'; // componentes a medida
+    | 'ricart-detail'
+    | 'waitdie-detail'
+    | 'simd-detail'
+    | 'gpu-detail'; // componentes a medida
 }
 
 export interface Section {
@@ -166,7 +169,7 @@ let resultado = handle.join().unwrap(); // espera y recupera el valor</span>
     icon: '🔱',
     color: '#4caf50',
     tag: 'Semana 2',
-    tagline: 'Dividir el trabajo, juntar los resultados: rayon, work stealing, MapReduce.',
+    tagline: 'Dividir el trabajo, juntar los resultados: rayon, work stealing, MapReduce, SIMD y GPU.',
     topics: [
       {
         title: 'El modelo fork-join',
@@ -219,6 +222,67 @@ let s = ['a','b','c','d','e'].par_iter()
 </ul>
 <p><strong>MapReduce</strong> es el modelo de programación para procesar grandes volúmenes de datos con esta idea: divide el trabajo en dos partes — <strong>mapear</strong> los datos y luego <strong>reducirlos</strong> — y lo hace en paralelo usando muchas computadoras.</p>
 <span class="tip">Rayon te garantiza el paralelismo <em>potencial</em>: si hay un solo core, <code>join(a,b)</code> simplemente corre secuencial. El programa expresa la estructura; el runtime decide cuánto paralelismo real hay.</span>`,
+      },
+      {
+        title: 'Vectorización: SIMD',
+        widget: 'simd-detail',
+        html: `
+<p>Fork-join tiene un piso de costo: <strong>lanzar incluso una task cuesta</strong> cómputo y accesos a memoria (se pierde localidad), y los cores de la CPU son pocos. Cuando el problema es <strong>un cómputo simple sobre un conjunto enorme de datos</strong> (procesar sonido, imágenes o video, entrenar redes neuronales) y <strong>cada dato es independiente</strong>, hay una herramienta más fina: la vectorización.</p>
+<p>Cuando la ley de Moore "se detuvo", el aumento de transistores dejó de traducirse en más velocidad. En su lugar se agregaron <strong>múltiples ALUs que operan sobre los mismos registros de forma concurrente</strong>. De ahí nacieron los juegos de instrucciones <strong>SIMD</strong> (<em>Single Instruction, Multiple Data</em>): MMX, SSE y AVX en x86, y NEON en ARM.</p>
+<ul>
+<li>Cada variable (registro) es un <strong>vector de tamaño fijo</strong>, generalmente de 128 a 512 bits.</li>
+<li>Se divide en <strong>N lanes</strong> (carriles) según el tamaño de los datos. Un registro de 512 bits aloja 16 enteros de 32 bits, o bien 8 flotantes de 64.</li>
+<li>Operaciones <strong>verticales</strong>: entre registros distintos, en el mismo lane. <span class="formula">[x0 x1 x2 x3] + [y0 y1 y2 y3] = [x0+y0 … x3+y3]</span>, en una sola instrucción.</li>
+<li>Operaciones <strong>horizontales</strong>: reducen un vector a un escalar (<span class="formula">x0+x1+x2+x3</span>). Son <strong>más lentas</strong>.</li>
+</ul>
+<p>La práctica implementa lo mismo de cuatro formas: pasar la imagen <code>totk.jpg</code> a escala de grises.</p>
+<div class="tablewrap"><table>
+<tr><th>Ejemplo</th><th>Cómo paraleliza</th></tr>
+<tr><td><code>base.rs</code></td><td>Nada: doble <code>for</code> que recorre píxel por píxel en un hilo.</td></tr>
+<tr><td><code>ryon.rs</code></td><td>Fork-join con <code>rayon::scope</code>: una task por fila de la imagen.</td></tr>
+<tr><td><code>simd.rs</code></td><td>Intrinsics NEON de <code>std::arch::aarch64</code>: <code>vmulq_f32</code> (vertical) y <code>vaddvq_f32</code> (horizontal), 8 píxeles por iteración.</td></tr>
+<tr><td><code>wgpu.rs</code> + <code>wgpu.wgsl</code></td><td>GPU: un thread por píxel (tema siguiente). En <code>CUDA.ipynb</code>, lo mismo en CUDA.</td></tr>
+</table></div>
+<span class="warn">En <code>ryon.rs</code> cada task escribe una fila distinta de la imagen de salida: no hay carrera real, pero el compilador no puede probarlo. Por eso el ejemplo envuelve el puntero en un <code>SendPointer</code> con <code>unsafe impl Send/Sync</code> y escribe con <code>ptr::write_bytes</code>. Esa garantía de que las regiones no se pisan la está dando el programador, no Rust.</span>`,
+      },
+      {
+        title: 'GPU: throughput sobre latencia',
+        widget: 'gpu-detail',
+        html: `
+<p>La GPU lleva la idea de SIMD al extremo: miles de hilos baratos ejecutando el mismo programa sobre datos distintos.</p>
+<div class="tablewrap"><table>
+<tr><th>CPU</th><th>GPU</th></tr>
+<tr><td>Diseñada para <strong>minimizar la latencia</strong></td><td>Diseñada para <strong>maximizar el throughput</strong></td></tr>
+<tr><td>Caches grandes</td><td>Más transistores dedicados a <strong>ALUs</strong></td></tr>
+<tr><td>Lógica complicada: pipeline, branch prediction, etc.</td><td>Los tiempos de espera de la RAM se <strong>diluyen intercalando</strong> la ejecución de distintos hilos</td></tr>
+<tr><td>Pocos hilos por núcleo: el context switch es <strong>caro</strong></td><td>Context switch <strong>muy económico</strong>: hasta uno por ciclo de reloj</td></tr>
+</table></div>
+<p><strong>Modelo de programación: jerarquía de hilos.</strong></p>
+<ul>
+<li>El programa se divide en un <strong>grid</strong> de <strong>workgroups</strong> independientes, cada uno con N <strong>threads</strong> (en CUDA: <em>blocks</em> y <em>threads</em>).</li>
+<li>Cada workgroup se ejecuta en paralelo sobre un mismo espacio de memoria compartida, de forma equivalente a un lane SIMD: se puede pensar que <strong>todos sus threads comparten el program counter</strong>.</li>
+<li>La performance es óptima cuando la cantidad de threads de un workgroup es <strong>múltiplo de 32</strong>, porque las implementaciones definen operaciones con esa cantidad de lanes ("<em>warp</em>" en CUDA, "<em>SIMD-group</em>" en Metal).</li>
+<li>Cada thread sabe qué dato le toca por sus índices: <code>workgroup_id</code>, <code>local_invocation_id</code> y <code>global_invocation_id = workgroup_id × tamaño + local</code>. Es lo que imprime <code>threadindexing.rs</code>.</li>
+</ul>
+<p><strong>WGSL</strong> (WebGPU Shader Language) es el lenguaje de los kernels en la práctica: parecido a Rust, fuertemente tipado y portable (corre sobre Vulkan, Metal y Direct3D 12). Desde Rust se usa con el crate <strong><code>wgpu</code></strong>.</p>
+<span class="rust">@compute @workgroup_size(32) fn computeSomething(
+  @builtin(num_workgroups) num_workgroups: vec3&lt;u32&gt;,
+  @builtin(global_invocation_id) global_invocation_id: vec3&lt;u32&gt;) {
+    let xy = global_invocation_id.x + (global_invocation_id.y * num_workgroups.x * 32);
+    let pixel = result[xy];
+    let gray = u32(f32(pixel &amp; 0xFF) * 0.299 + f32((pixel &gt;&gt; 8) &amp; 0xFF) * 0.587
+                 + f32((pixel &gt;&gt; 16) &amp; 0xFF) * 0.114) &amp; 0xFF;
+    result[xy] = gray | gray &lt;&lt; 8 | gray &lt;&lt; 16;
+}</span>
+<p><strong>El típico programa</strong> (host = CPU, device = GPU):</p>
+<ol>
+<li>Declarar y reservar memoria en el host y en el device.</li>
+<li>Inicializar los datos en el host.</li>
+<li>Transferir los datos del host al device (y entre memoria mapeable y no mapeable).</li>
+<li>Ejecutar uno o más shaders (funciones que corren en la GPU) y esperar a que terminen.</li>
+<li>Transferir los resultados del device al host (no mapeable → mapeable → host).</li>
+</ol>
+<span class="warn">Los pasos 3 y 5 no son gratis: copiar los datos a la GPU y traerlos de vuelta puede costar más que el cálculo. Por eso <code>wgpu.rs</code> mide por separado la subida, la ejecución y la bajada. La GPU conviene cuando hay <strong>mucho</strong> cómputo por cada byte transferido.</span>`,
       },
     ],
   },
@@ -1033,12 +1097,31 @@ let socket = TcpStream::connect("localhost:8080")?;</span>
 <p>Con transacciones tomando locks en varios nodos, el deadlock reaparece — pero ahora <strong>nadie ve el grafo de espera completo</strong>: cada nodo conoce solo sus aristas. Estrategias:</p>
 <ul>
 <li><strong>Detección</strong>: construir el grafo global (un detector central que junta los grafos locales, o <em>edge chasing</em>: mensajes <em>probe</em> que siguen las cadenas de espera; si tu probe te vuelve, hay ciclo → abortás una transacción víctima).</li>
-<li><strong>Prevención por timestamps</strong> — comparando la "edad" de las transacciones: <strong>wait-die</strong> (el viejo espera; el joven muere y reintenta) y <strong>wound-wait</strong> (el viejo "hiere" al joven y le saca el lock). Ambos rompen la espera circular imponiendo un orden global por edad.</li>
+<li><strong>Prevención por timestamps</strong>: wait-die y wound-wait. Están desarrollados con su animación en el tema siguiente.</li>
 <li><strong>Timeouts</strong>: lo más usado en la práctica — esperaste demasiado un lock, abortá y reintentá. Simple, con falsos positivos.</li>
 </ul>
 <p><strong>Detección centralizada</strong>: el proceso coordinador mantiene el grafo de uso de recursos; los procesos le envían mensajes cuando obtienen/liberan un recurso y él actualiza el grafo. <strong>El deadlock ocurre cuando se presenta un ciclo</strong>. Problema: los mensajes pueden llegar desordenados y generar <strong>falsos deadlocks</strong> (posible solución: timestamps globales de Lamport).</p>
 <p><strong>Detección distribuida</strong>: cuando un proceso debe esperar por un recurso, envía un <em>probe message</em> al proceso que lo tiene. El mensaje contiene: id del proceso que se bloquea, id del que envía y del destinatario. Al recibirlo, el proceso actualiza el id del proceso que envía y el id del destinatario, y lo reenvía a los procesos que tienen el recurso que necesita. <strong>Si el mensaje vuelve al proceso original, hay un ciclo en el grafo.</strong> Ventaja: no hay coordinador → no hay single point of failure.</p>
 <span class="tip">Conexión con Coffman: todas estas técnicas atacan la <strong>espera circular</strong>, igual que el orden global de recursos en los filósofos — pero acá el ciclo hay que descubrirlo (o prevenirlo) con mensajes, porque no hay memoria compartida donde mirarlo.</span>`,
+      },
+      {
+        title: 'Prevención de deadlocks: wait-die y wound-wait',
+        widget: 'waitdie-detail',
+        html: `
+<p>En vez de detectar el ciclo y romperlo después, estos algoritmos <strong>impiden que se forme</strong>. A cada transacción se le asigna un <strong>timestamp único y global al iniciar</strong> (con relojes de Lamport): menor timestamp = transacción más vieja.</p>
+<p>Cuando T1 está por bloquearse esperando un recurso que tiene T2, se comparan los timestamps:</p>
+<p><strong>Wait-die</strong></p>
+<ul>
+<li>Si <span class="formula">T1 &lt; T2</span> (el que pide es más viejo) → T1 <strong>espera</strong>: <em>wait</em>.</li>
+<li>Si <span class="formula">T1 &gt; T2</span> (el que pide es más joven) → T1 <strong>aborta</strong>: <em>die</em>. El nuevo no espera al viejo.</li>
+</ul>
+<p><strong>Wound-wait</strong></p>
+<ul>
+<li>Si <span class="formula">T1 &lt; T2</span> (el que pide es más viejo) → T2 <strong>aborta</strong> para que el viejo pueda tomar el recurso: <em>wound</em>, el viejo "hiere" al joven.</li>
+<li>Si <span class="formula">T1 &gt; T2</span> (el que pide es más joven) → T1 <strong>espera</strong>: <em>wait</em>.</li>
+</ul>
+<p><strong>¿Por qué en los dos aborta siempre la más joven?</strong> La transacción más vieja estadísticamente realizó más operaciones. Es preferible minimizar los abortos de la vieja, porque deshacer su trabajo es más costoso.</p>
+<span class="tip">Por qué funcionan: en wait-die solo un viejo puede esperar a un joven, y en wound-wait solo un joven puede esperar a un viejo. Las esperas van siempre en <strong>un único sentido de edad</strong>, así que no se puede cerrar un ciclo, que es la <strong>espera circular</strong> de Coffman. Y como la transacción abortada se reinicia <strong>con su timestamp original</strong>, con el tiempo pasa a ser la más vieja y deja de abortar: no hay starvation.</span>`,
       },
       {
         title: 'Ambientes distribuidos: entidades y comportamiento',
