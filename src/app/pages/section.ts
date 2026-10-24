@@ -104,6 +104,7 @@ import { GpuDetail } from '../components/detail/gpu-detail';
               @case ('distmutex-detail') { <app-distmutex-detail /> }
               @case ('petri-detail') { <app-petri-detail /> }
               @case ('reach-detail') { <app-reach-detail /> }
+              @case ('reach-carga') { <app-reach-detail start="carga" /> }
               @case ('memory-detail') { <app-memory-detail /> }
               @case ('timeline-detail') { <app-timeline-detail /> }
               @case ('sockets-detail') { <app-sockets-detail /> }
