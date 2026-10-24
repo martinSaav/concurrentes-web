@@ -286,13 +286,45 @@ const NET_PESOS: PNet = {
   ],
 };
 
-const NETS = [NET_MUTEX, NET_PRODCONS, NET_CLISERV, NET_RW, NET_INHIB, NET_BARBERO, NET_BANQUERO, NET_PESOS];
+/** final 3/2/2026: estación de carga (2 surtidores, mantenimiento cada 4 cargas) */
+const NET_CARGA: PNet = {
+  id: 'carga',
+  name: '⚡ Estación de carga',
+  desc: 'Ejercicio de final: 2 surtidores, mantenimiento cada 4 cargas y solo con la estación vacía. t3 necesita 4 cargas finalizadas (peso 4) y está inhibida por "cargando". Invariantes: libres + cargando = 2 y cupo + cargando + finalizadas = 4.',
+  places: [
+    { id: 'Pe', label: 'vehículos esperando', x: 50, y: 9, tokens: 3 },
+    { id: 'Pl', label: 'surtidores libres', x: 50, y: 30, tokens: 2 },
+    { id: 'Pc', label: 'cargando', x: 50, y: 52, tokens: 0 },
+    { id: 'Pk', label: 'cupo', x: 14, y: 82, tokens: 4 },
+    { id: 'Pf', label: 'finalizadas', x: 86, y: 82, tokens: 0 },
+  ],
+  trans: [
+    { id: 't1', label: 't1 · iniciar carga', x: 30, y: 52, lp: 'l' },
+    { id: 't2', label: 't2 · finalizar carga', x: 70, y: 52, lp: 'r' },
+    { id: 't3', label: 't3 · mantenimiento', x: 50, y: 88 },
+  ],
+  arcs: [
+    { from: 'Pe', to: 't1', w: 1, bend: 8 },
+    { from: 'Pl', to: 't1', w: 1 },
+    { from: 'Pk', to: 't1', w: 1, bend: 8 },
+    { from: 't1', to: 'Pc', w: 1 },
+    { from: 'Pc', to: 't2', w: 1 },
+    { from: 't2', to: 'Pe', w: 1, bend: 8 },
+    { from: 't2', to: 'Pl', w: 1 },
+    { from: 't2', to: 'Pf', w: 1, bend: 8 },
+    { from: 'Pf', to: 't3', w: 4 },
+    { from: 't3', to: 'Pk', w: 4 },
+    { from: 'Pc', to: 't3', w: 1, inhib: true },
+  ],
+};
+
+const NETS = [NET_MUTEX, NET_PRODCONS, NET_CLISERV, NET_RW, NET_INHIB, NET_BARBERO, NET_BANQUERO, NET_PESOS, NET_CARGA];
 
 /**
  * Simulador de redes de Petri: transiciones habilitadas en verde, click para
  * disparar. Soporta pesos, arcos curvos y arcos inhibidores (─○). Redes de la
  * teórica y la práctica: mutex, prod-cons, cliente-servidor, lector-escritor,
- * barbero, banquero, pesos.
+ * barbero, banquero, pesos, y la estación de carga de un final.
  */
 @Component({
   selector: 'app-petri-detail',

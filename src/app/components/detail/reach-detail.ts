@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, input, signal } from '@angular/core';
 
 interface RNet {
   id: string;
@@ -6,10 +6,19 @@ interface RNet {
   desc: string;
   placeIds: string[];
   m0: number[];
-  // transición: [consume por lugar, produce por lugar]
-  trans: { id: string; in: number[]; out: number[]; x: number; y: number }[];
+  // transición: [consume por lugar, produce por lugar, lugares que inhiben (deben estar vacíos)]
+  trans: { id: string; in: number[]; out: number[]; inh?: number[]; x: number; y: number }[];
   places: { x: number; y: number }[];
-  arcs: { from: number | string; to: number | string }[]; // índice de lugar o id de transición
+  arcs: RArc[];
+  /** grafo profundo: va debajo de la red, a todo el ancho */
+  stack?: boolean;
+}
+
+interface RArc {
+  from: number | string; // índice de lugar o id de transición
+  to: number | string;
+  w?: number;
+  inhib?: boolean;
 }
 
 /** Ejemplo 1 de la teórica: red cíclica, 5 marcados alcanzables, acotada */
@@ -68,8 +77,40 @@ const NET_EJ2: RNet = {
   ],
 };
 
-const RNETS = [NET_EJ1, NET_EJ2];
+/** final 3/2/2026: estación de carga. Marcado (esp, lib, carg, cupo, fin) */
+const NET_CARGA: RNet = {
+  id: 'carga',
+  name: 'Estación de carga (final)',
+  desc: 'Lugares: esp = vehículos esperando, lib = surtidores libres, carg = cargando, cupo = cargas que quedan antes del mantenimiento, fin = cargas finalizadas. t1 = iniciar carga, t2 = finalizar carga, t3 = mantenimiento (peso 4 desde fin, inhibida por carg).',
+  placeIds: ['esp', 'lib', 'carg', 'cupo', 'fin'],
+  m0: [3, 2, 0, 4, 0],
+  trans: [
+    { id: 't1', in: [1, 1, 0, 1, 0], out: [0, 0, 1, 0, 0], x: 30, y: 52 },
+    { id: 't2', in: [0, 0, 1, 0, 0], out: [1, 1, 0, 0, 1], x: 70, y: 52 },
+    { id: 't3', in: [0, 0, 0, 0, 4], out: [0, 0, 0, 4, 0], inh: [2], x: 50, y: 88 },
+  ],
+  places: [
+    { x: 50, y: 12 },
+    { x: 50, y: 32 },
+    { x: 50, y: 52 },
+    { x: 14, y: 82 },
+    { x: 86, y: 82 },
+  ],
+  arcs: [
+    { from: 0, to: 't1' }, { from: 1, to: 't1' }, { from: 3, to: 't1' }, { from: 't1', to: 2 },
+    { from: 2, to: 't2' }, { from: 't2', to: 0 }, { from: 't2', to: 1 }, { from: 't2', to: 4 },
+    { from: 4, to: 't3', w: 4 }, { from: 't3', to: 3, w: 4 }, { from: 2, to: 't3', inhib: true },
+  ],
+  stack: true,
+};
+
+const RNETS = [NET_EJ1, NET_EJ2, NET_CARGA];
 const MAX_NODES = 14;
+
+/** habilitada: alcanzan los tokens de cada entrada y los lugares inhibidores están vacíos */
+function isEnabled(t: RNet['trans'][number], m: number[]): boolean {
+  return t.in.every((need, i) => m[i] >= need) && (t.inh ?? []).every((i) => m[i] === 0);
+}
 const UNBOUND_LIMIT = 6; // si un lugar pasa este valor, declaramos no acotada
 
 interface GNode {
@@ -116,7 +157,7 @@ interface GEdge {
       </div>
       <div class="netdesc">{{ net().desc }}</div>
 
-      <div class="board">
+      <div class="board" [class.stack]="net().stack">
         <!-- red -->
         <div class="arena">
           <div class="a-label">la red · marcado ({{ curKey() }})</div>
@@ -125,11 +166,19 @@ interface GEdge {
               <marker id="rarrow" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto">
                 <path d="M0,0 L6,3 L0,6 z" fill="#5c6a8e" />
               </marker>
+              <marker id="rinhib" markerWidth="8" markerHeight="8" refX="6.4" refY="3.2" orient="auto">
+                <circle cx="3.2" cy="3.2" r="2.4" fill="#171e2e" stroke="#ef9a9a" stroke-width="1" />
+              </marker>
             </defs>
             @for (a of net().arcs; track $index) {
               <line [attr.x1]="ax(a, true)" [attr.y1]="ay(a, true)"
                     [attr.x2]="ax(a, false)" [attr.y2]="ay(a, false)"
-                    class="arc" marker-end="url(#rarrow)" />
+                    class="arc" [class.inh]="a.inhib"
+                    [attr.marker-end]="a.inhib ? 'url(#rinhib)' : 'url(#rarrow)'" />
+              @if (a.w && a.w > 1) {
+                <text [attr.x]="(ax(a, true) + ax(a, false)) / 2" [attr.y]="(ay(a, true) + ay(a, false)) / 2 - 1.4"
+                      font-size="3.6" fill="#ffd54f" font-weight="800" text-anchor="middle">{{ a.w }}</text>
+              }
             }
             @for (p of net().places; track $index; let i = $index) {
               <g>
@@ -180,7 +229,7 @@ interface GEdge {
                       [attr.fill]="n.key === curKey() ? '#2a2a1a' : '#10151f'"
                       [attr.stroke]="n.key === curKey() ? '#ffd54f' : '#39445f'" stroke-width="0.7" />
                 <text [attr.x]="pos(n.key).x" [attr.y]="pos(n.key).y + 1.2" text-anchor="middle"
-                      [attr.font-size]="boxW() < 17 ? 2.7 : 3.2"
+                      [attr.font-size]="boxW() < 17 || n.key.length > 9 ? 2.7 : 3.2"
                       [attr.fill]="n.key === curKey() ? '#ffd54f' : '#c8d0e4'" font-weight="700">
                   ({{ n.key }})
                 </text>
@@ -228,12 +277,15 @@ interface GEdge {
     .netdesc { color: var(--text-dim); font-size: 0.78rem; margin-bottom: 10px; line-height: 1.5; }
 
     .board { display: grid; grid-template-columns: 1fr 1.15fr; gap: 12px; }
+    .board.stack { grid-template-columns: 1fr; }
+    .board.stack .reach { min-height: 600px; }
     .arena { position: relative; min-height: 420px; background: radial-gradient(ellipse at 50% 45%, #202a40 0%, #171e2e 80%); border: 1px solid var(--border); border-radius: 10px; }
     .arena svg { position: absolute; inset: 0; width: 100%; height: 100%; }
     /* halo oscuro: aristas y arcos no tachan el texto */
     .arena svg text { paint-order: stroke; stroke: #1b2336; stroke-width: 0.8px; stroke-linejoin: round; }
     .a-label { position: absolute; top: 6px; left: 10px; z-index: 2; font-size: 0.66rem; text-transform: uppercase; letter-spacing: 1px; color: #5c6a8e; font-weight: 700; }
     .arc { stroke: #5c6a8e; stroke-width: 0.35; }
+    .arc.inh { stroke: #ef9a9a; stroke-dasharray: 1.2 1.2; }
     .tr { cursor: pointer; }
     .gedge { fill: none; stroke: #8b95b5; stroke-width: 0.35; }
     .gedge.back { stroke-dasharray: 1.2 0.9; }
@@ -246,11 +298,14 @@ interface GEdge {
 
     @media (max-width: 720px) {
       .board { grid-template-columns: 1fr; }
+      .board.stack .reach { min-height: 380px; }
     }
   `,
 })
-export class ReachDetail {
+export class ReachDetail implements OnInit {
   readonly nets = RNETS;
+  /** red con la que arranca (para reusar el widget en otro tema) */
+  readonly start = input('ej1');
 
   readonly netId = signal('ej1');
   readonly marking = signal<number[]>([...NET_EJ1.m0]);
@@ -266,12 +321,16 @@ export class ReachDetail {
   readonly enabled = computed(() => {
     const m = this.marking();
     return this.net()
-      .trans.filter((t) => t.in.every((need, i) => m[i] >= need))
+      .trans.filter((t) => isEnabled(t, m))
       .map((t) => t.id);
   });
 
   constructor() {
     this.seedGraph();
+  }
+
+  ngOnInit(): void {
+    if (this.start() !== this.netId()) this.selectNet(this.start());
   }
 
   private seedGraph(): void {
@@ -302,13 +361,13 @@ export class ReachDetail {
     const t = this.net().trans.find((x) => x.id === ref)!;
     return { x: t.x, y: t.y, r: 3.2 };
   }
-  ax(a: { from: number | string; to: number | string }, start: boolean): number {
+  ax(a: RArc, start: boolean): number {
     const f = this.rNodePos(a.from);
     const t = this.rNodePos(a.to);
     const d = Math.hypot(t.x - f.x, t.y - f.y) || 1;
     return start ? f.x + ((t.x - f.x) / d) * f.r : t.x - ((t.x - f.x) / d) * t.r;
   }
-  ay(a: { from: number | string; to: number | string }, start: boolean): number {
+  ay(a: RArc, start: boolean): number {
     const f = this.rNodePos(a.from);
     const t = this.rNodePos(a.to);
     const d = Math.hypot(t.x - f.x, t.y - f.y) || 1;
@@ -330,7 +389,7 @@ export class ReachDetail {
     }
     const maxDepth = Math.max(0, ...ns.map((n) => n.depth));
     // deja libre el pie (y > 92) para el cartel de "grafo infinito"
-    const dy = maxDepth === 0 ? 0 : Math.min(15, 75 / maxDepth);
+    const dy = maxDepth === 0 ? 0 : Math.min(15, (this.truncated() ? 75 : 82) / maxDepth);
     const out = new Map<string, { x: number; y: number }>();
     for (const [depth, row] of byDepth) {
       row.forEach((n, k) => out.set(n.key, { x: ((k + 1) / (row.length + 1)) * 100, y: 12 + depth * dy }));
@@ -374,7 +433,16 @@ export class ReachDetail {
     const cy = (f.y + t.y) / 2;
     if (back) {
       const dir = f.x + t.x >= 100 ? 1 : -1; // hacia el lado donde ya están los nodos
-      cx = Math.max(3, Math.min(97, cx + dir * (12 + 4 * (fd - td))));
+      // el punto medio de la curva cae a mitad de camino entre la cuerda y el control:
+      // el control se aleja lo necesario para que la curva rodee las cajas intermedias
+      const half = this.boxW() / 2 + 3;
+      const edges = this.nodes()
+        .filter((n) => n.depth > td && n.depth < fd)
+        .map((n) => this.pos(n.key).x + dir * half);
+      const clear = edges.length ? 2 * (dir > 0 ? Math.max(...edges) : Math.min(...edges)) - cx : cx;
+      const base = cx + dir * (12 + 4 * (fd - td));
+      cx = dir > 0 ? Math.max(base, clear) : Math.min(base, clear);
+      cx = Math.max(-40, Math.min(140, cx));
     }
 
     const clip = (p: { x: number; y: number }, q: { x: number; y: number }) => {
@@ -453,7 +521,7 @@ export class ReachDetail {
       const fromKey = m.join(',');
       let any = false;
       for (const t of net.trans) {
-        if (!t.in.every((need, i) => m[i] >= need)) continue;
+        if (!isEnabled(t, m)) continue;
         any = true;
         const nm = m.map((v, i) => v - t.in[i] + t.out[i]);
         const key = nm.join(',');

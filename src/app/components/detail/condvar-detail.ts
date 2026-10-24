@@ -194,6 +194,8 @@ const STEPS: CvStep[] = [
     .spd.on { background: #1f6feb; color: #fff; font-weight: 700; }
 
     .board { display: grid; grid-template-columns: 1.2fr 0.8fr 1.2fr; gap: 12px; align-items: start; }
+    /* sin esto las líneas de código (white-space: pre) ensanchan la columna y desbordan */
+    .board > * { min-width: 0; }
     .codepanel { background: #0b0f19; border: 1px solid var(--border); border-radius: 10px; padding: 10px; transition: border-color 0.25s, box-shadow 0.25s; }
     .codepanel.holds { border-color: #ffd54f; box-shadow: 0 0 12px rgba(255, 213, 79, 0.18); }
     .cp-head { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }

@@ -18,6 +18,7 @@ export interface Topic {
     | 'distmutex-detail'
     | 'petri-detail'
     | 'reach-detail'
+    | 'reach-carga'
     | 'memory-detail'
     | 'timeline-detail'
     | 'sockets-detail'
@@ -199,7 +200,13 @@ let resultado = handle.join().unwrap(); // espera y recupera el valor</span>
 <li>Si su cola está vacía, roba una tarea <strong>del principio</strong> de la cola de otro thread (elegido al azar).</li>
 </ul>
 <p><strong>¿Por qué se roba del principio y no del final?</strong> Porque el thread dueño está sacando tareas del final: así <strong>no hay conflicto</strong>: uno saca por delante y el otro por atrás.</p>
-<p><strong>¿Por qué un deque por thread y no una única cola compartida?</strong> Con una cola única, todos los threads competirían por el acceso: cada uno que quisiera agregar o tomar una tarea tendría que esperar su turno, aumentando el tiempo necesario y la <strong>necesidad de sincronización</strong> (habría que lockear la cola). Con un deque por thread, los workers <strong>solo se comunican cuando lo necesitan</strong> → menos sincronización, menos complejidad, mejor rendimiento.</p>`,
+<p><strong>¿Por qué un deque por thread y no una única cola compartida?</strong> Con una cola única, todos los threads competirían por el acceso: cada uno que quisiera agregar o tomar una tarea tendría que esperar su turno, aumentando el tiempo necesario y la <strong>necesidad de sincronización</strong> (habría que lockear la cola). Con un deque por thread, los workers <strong>solo se comunican cuando lo necesitan</strong> → menos sincronización, menos complejidad, mejor rendimiento.</p>
+<p>Hay dos argumentos más a favor del work stealing:</p>
+<ul>
+<li><strong>Localidad de caché</strong>: cada thread sigue trabajando sobre las subtareas que él mismo creó, tomándolas del final de su deque (LIFO). Son las más recientes y sus datos todavía están en la caché de ese núcleo. Con una cola única, cada subtarea puede terminar en cualquier núcleo y hay que volver a traer sus datos de memoria.</li>
+<li><strong>Se roba poco y se roba grande</strong>: en divide &amp; conquer, las tareas del <strong>principio</strong> del deque son las más viejas, que son las más <strong>grandes</strong> (todavía no se partieron). El ladrón se lleva un pedazo grande de trabajo que va a partir en su propio deque, y por un buen rato no necesita robar de nuevo. Los robos, que son la única operación que necesita sincronización, son raros.</li>
+</ul>
+<p>Además, con <strong>reparto estático</strong> (dividir el trabajo en N partes fijas al principio) si una parte resulta más pesada, los demás threads quedan ociosos. Work stealing balancea <strong>dinámicamente</strong>: el que termina antes ayuda al que va atrasado.</p>`,
       },
       {
         title: 'Rayon y MapReduce',
@@ -544,7 +551,42 @@ while !*started {
 <tr><td><code>signal</code> siempre tiene efecto</td><td><code>signalC</code> <strong>no tiene efecto</strong> si la cola está vacía</td></tr>
 <tr><td><code>signal</code> desbloquea un proceso <strong>arbitrario</strong></td><td><code>signalC</code> desbloquea el proceso <strong>del tope de la cola</strong> (FIFO)</td></tr>
 <tr><td>Un proceso desbloqueado con signal puede continuar su ejecución inmediatamente</td><td>Un proceso desbloqueado con signalC debe esperar a que el proceso señalizador deje el monitor</td></tr>
+<tr><td>Es un <strong>contador</strong>: recuerda los signal que nadie esperaba</td><td>La condition variable <strong>no guarda valor</strong>: un signalC sin nadie esperando se pierde</td></tr>
+<tr><td>La exclusión mutua la arma el programador (wait/signal en el orden correcto en cada lugar del código)</td><td>La exclusión mutua es <strong>automática</strong>: los procedimientos del monitor se ejecutan de a uno</td></tr>
+<tr><td>Primitiva de bajo nivel, dispersa por todo el código</td><td>Estructura de alto nivel que <strong>encapsula</strong> estado + sincronización en un solo lugar</td></tr>
 </table></div>
+<p><strong>Similitudes entre monitores y semáforos:</strong></p>
+<ul>
+<li>Los dos son mecanismos de sincronización para coordinar procesos que <strong>comparten recursos</strong>.</li>
+<li>Los dos resuelven los mismos dos problemas: <strong>exclusión mutua</strong> y <strong>sincronización por condición</strong> (esperar a que algo pase).</li>
+<li>Los dos <strong>bloquean</strong> al proceso que espera, sin busy-waiting, y lo guardan en una estructura de espera: el set L del semáforo, o la cola FIFO de la condition variable.</li>
+<li>Sus operaciones son <strong>atómicas</strong>.</li>
+<li>Tienen el <strong>mismo poder expresivo</strong>: se puede implementar un monitor con semáforos y un semáforo con un monitor.</li>
+</ul>
+<p><strong>Ejemplo: el buffer acotado como monitor.</strong> Todo el estado y toda la sincronización quedan adentro; el productor y el consumidor solo llaman <code>append</code> y <code>take</code>:</p>
+<span class="rust">monitor Buffer
+  buffer: cola de N lugares
+  notEmpty, notFull: condition
+
+  operation append(d)
+    while buffer lleno
+      waitC(notFull)
+    agregar d al buffer
+    signalC(notEmpty)
+
+  operation take()
+    while buffer vacío
+      waitC(notEmpty)
+    d &lt;- sacar del buffer
+    signalC(notFull)
+    return d</span>
+<p>Compará con la versión con semáforos de "Productor-consumidor": ahí cada productor y consumidor tiene que hacer los wait y signal <strong>en el orden correcto</strong> (semáforo primero, mutex después) o se cae en deadlock. Con el monitor, ese orden vive en un solo lugar y quien lo usa no puede equivocarse.</p>
+<p><strong>¿Cuándo conviene cada uno?</strong></p>
+<ul>
+<li><strong>Monitor</strong>: cuando la condición de espera depende de un <strong>estado compuesto</strong> (varias variables) o hay <strong>varias condiciones distintas</strong> sobre el mismo estado. Ejemplos: el buffer (lleno / vacío), lector-escritor (hay escritor / hay lectores), los fumadores (están mis dos ingredientes). Con semáforos habría que repartir la lógica por todo el código.</li>
+<li><strong>Semáforo</strong>: cuando hay que <strong>contar recursos idénticos</strong> (un pool de N conexiones, un estacionamiento con N lugares) o mandar una <strong>señal simple</strong> de un proceso a otro (uno hace signal y el otro wait). Ahí un contador alcanza y el monitor es más de lo necesario.</li>
+</ul>
+<span class="warn">Por qué <code>while</code> y no <code>if</code>: con la semántica de la tabla, el proceso despertado espera a que el señalizador salga del monitor. En ese hueco otro proceso puede entrar y volver a llenar el buffer, así que hay que <strong>re-chequear la condición</strong> al despertar. Es la misma regla que las condvars de Rust.</span>
 <span class="tip">La gran ventaja: si en un semáforo te <strong>olvidás de hacer signal(S)</strong>, podés entrar en deadlock. Con monitores eso no ocurre, porque el objeto mismo se encarga de sincronizar — vos no te encargás.</span>`,
       },
       {
@@ -617,10 +659,17 @@ if wait_result.is_leader() {
 <p>Una <strong>red de Petri</strong> es un grafo dirigido <strong>bipartito</strong>. La <strong>red ordinaria</strong> es <span class="formula">PN = (T, P, A)</span>: <strong>transiciones</strong> <code>T</code> (barras — los <strong>eventos</strong> que cambian el estado), <strong>lugares</strong> <code>P</code> (círculos — los <strong>estados</strong>/condiciones) y <strong>arcos</strong> <code>A ⊆ (T×P) ∪ (P×T)</code> — siempre de lugar a transición o viceversa, nunca entre iguales.</p>
 <ul>
 <li>La <strong>función de marca</strong> <span class="formula">M : P → ℕ∪0</span> dice cuántos <strong>tokens</strong> hay en cada lugar. El vector M es LA foto del estado del sistema; <code>M₀</code> es el marcado inicial.</li>
-<li>Cada transición tiene sus lugares de <strong>entrada</strong> <code>I(t)</code> y de <strong>salida</strong> <code>O(t)</code>.</li>
 <li>La <strong>red general</strong> agrega pesos: <span class="formula">PN = (T, P, A, W, M₀)</span> con <code>W : A → ℕ</code>. Regla de disparo: t está <strong>habilitada</strong> ⟺ <span class="formula">M(p) ≥ W(p,t) ∀p ∈ I(t)</span>. Al disparar consume <code>W(p,t)</code> de cada entrada y produce <code>W(t,p')</code> en cada salida — atómicamente.</li>
 <li>El no determinismo es explícito: si varias están habilitadas, <em>cualquiera</em> puede disparar. Eso ES la concurrencia en el modelo.</li>
 </ul>
+<p><strong>Funciones de Entrada y Salida.</strong> Son la otra forma de describir los arcos: en lugar de listar pares, a cada transición se le asocian sus lugares. Con esto la red se escribe <span class="formula">PN = (P, T, I, O)</span>:</p>
+<ul>
+<li><strong>Función de entrada</strong> <span class="formula">I : T → P<sup>∞</sup></span>. <code>I(t)</code> son los <strong>lugares de entrada</strong> de t, los que tienen un arco hacia t: <span class="formula">I(t) = { p ∈ P : (p,t) ∈ A }</span>. Son sus <em>precondiciones</em>.</li>
+<li><strong>Función de salida</strong> <span class="formula">O : T → P<sup>∞</sup></span>. <code>O(t)</code> son los <strong>lugares de salida</strong> de t, a los que t les manda un arco: <span class="formula">O(t) = { p ∈ P : (t,p) ∈ A }</span>. Son sus <em>postcondiciones</em>.</li>
+<li>En una red <strong>ordinaria</strong>, I(t) y O(t) son <strong>conjuntos</strong>: entre un lugar y una transición hay a lo sumo un arco. En una red <strong>general</strong> son <strong>multiconjuntos</strong> (bags, por eso P<sup>∞</sup>): un lugar puede aparecer varias veces. Su multiplicidad <span class="formula">#(p, I(t))</span> es la cantidad de arcos de p a t, o sea el peso <code>W(p,t)</code>.</li>
+</ul>
+<p>Ejemplo: si t1 necesita 2 tokens de p1 y 1 de p2, y produce 2 en p3, entonces <span class="formula">I(t1) = {p1, p1, p2}</span> y <span class="formula">O(t1) = {p3, p3}</span> (es la red "con pesos" del simulador). Con estas funciones el disparo se escribe en una sola fórmula:</p>
+<p><span class="formula">t habilitada ⟺ M(p) ≥ #(p, I(t)) ∀p</span> &nbsp;y&nbsp; <span class="formula">M'(p) = M(p) − #(p, I(t)) + #(p, O(t))</span></p>
 <span class="tip">Interpretaciones típicas (tabla de la teórica): lugares de entrada = precondiciones / datos / buffers de entrada; transiciones = eventos / cómputos / procesador; lugares de salida = postcondiciones / datos de salida.</span>`,
       },
       {
@@ -648,6 +697,55 @@ if wait_result.is_leader() {
 </ul>
 <p><strong>Lector-escritor necesita más poder</strong>: "el escritor entra solo si NO hay lectores" es una condición de <em>cero</em>, y las redes clásicas solo testean "hay al menos W(p,t)". Se extiende con el <strong>arco inhibidor</strong> (termina en un circulito): habilita la transición solo si su lugar está <strong>vacío</strong>.</p>
 <span class="warn">El arco inhibidor no es un detalle: le da a las redes de Petri poder de Turing y hace la verificación general indecidible. ¿Por qué lector-escritor no sale con una red ordinaria? Porque no se puede testear vacío.</span>`,
+      },
+      {
+        title: 'Ejercicio de final resuelto: estación de carga',
+        widget: 'reach-carga',
+        html: `
+<p><strong>Enunciado</strong> (final del 3/2/2026): una estación de carga de vehículos eléctricos opera con estas reglas:</p>
+<ol>
+<li>Hasta <strong>2 vehículos</strong> pueden cargarse a la vez.</li>
+<li>Si la estación completó <strong>4 cargas seguidas</strong>, un técnico debe hacer un <strong>mantenimiento</strong> antes de permitir nuevas cargas.</li>
+<li>El mantenimiento solo puede hacerse si <strong>ningún vehículo está cargando</strong>.</li>
+<li>"Iniciar carga", "finalizar carga" y "realizar mantenimiento" son <strong>atómicas</strong>.</li>
+</ol>
+<p>Se pide modelarlo con una red de Petri, mostrar un grafo de alcance y explicar cómo el modelo garantiza la regla 3.</p>
+<p><strong>5.1 · El modelo.</strong> Las acciones atómicas son transiciones y los "contadores" del enunciado son lugares con tokens. Uso 3 vehículos, así la regla de los 2 surtidores efectivamente se pone a prueba:</p>
+<div class="tablewrap"><table>
+<tr><th>Lugar</th><th>Significado</th><th>M₀</th></tr>
+<tr><td><code>esp</code></td><td>Vehículos esperando para cargar</td><td>3</td></tr>
+<tr><td><code>lib</code></td><td>Surtidores libres (regla 1)</td><td>2</td></tr>
+<tr><td><code>carg</code></td><td>Vehículos cargando</td><td>0</td></tr>
+<tr><td><code>cupo</code></td><td>Cargas que todavía se pueden iniciar antes del mantenimiento (regla 2)</td><td>4</td></tr>
+<tr><td><code>fin</code></td><td>Cargas finalizadas desde el último mantenimiento</td><td>0</td></tr>
+</table></div>
+<div class="tablewrap"><table>
+<tr><th>Transición</th><th>Consume</th><th>Produce</th></tr>
+<tr><td><code>t1</code> · iniciar carga</td><td>1 de esp, 1 de lib, 1 de cupo</td><td>1 en carg</td></tr>
+<tr><td><code>t2</code> · finalizar carga</td><td>1 de carg</td><td>1 en esp (el vehículo se va y puede volver), 1 en lib, 1 en fin</td></tr>
+<tr><td><code>t3</code> · realizar mantenimiento</td><td><strong>4 de fin</strong> (arco de peso 4) · <strong>arco inhibidor desde carg</strong></td><td><strong>4 en cupo</strong> (arco de peso 4)</td></tr>
+</table></div>
+<p>Es una red <strong>general</strong>, porque tiene pesos, y con <strong>arco inhibidor</strong>. También está cargada en el simulador del primer tema (preset "⚡ Estación de carga"), con nombres completos.</p>
+<p><strong>Interpretación de "4 cargas seguidas":</strong> el lugar <code>cupo</code> hace que se puedan <strong>iniciar</strong> como mucho 4 cargas entre dos mantenimientos. Sin él, con 3 cargas finalizadas y 1 en curso podría arrancar una quinta, y la estación pasaría las 4 cargas antes del mantenimiento. Conviene aclarar esta decisión en el examen.</p>
+<p><strong>5.2 · Grafo de alcance.</strong> Una ejecución posible, con marcados <span class="formula">(esp, lib, carg, cupo, fin)</span>:</p>
+<span class="rust">M0 (3,2,0,4,0) -t1-> (2,1,1,3,0) -t1-> (1,0,2,2,0)   lib = 0: t1 deshabilitada
+   -t2-> (2,1,1,2,1) -t2-> (3,2,0,2,2)
+   -t1-> (2,1,1,1,2) -t1-> (1,0,2,0,2)                 cupo = 0: no se inician más cargas
+   -t2-> (2,1,1,0,3) -t2-> (3,2,0,0,4)                 solo t3 habilitada
+   -t3-> (3,2,0,4,0) = M0</span>
+<p>Con el botón <strong>BFS</strong> del widget se ve el grafo completo: <strong>12 marcados</strong>, ninguno muerto. La red es <strong>viva</strong>, está <strong>acotada</strong> (ningún lugar pasa de 4 tokens) y es <strong>reversible</strong>, porque siempre se puede volver a M₀.</p>
+<p><strong>5.3 · Por qué el mantenimiento solo ocurre sin vehículos cargando.</strong> Hay dos garantías:</p>
+<ul>
+<li><strong>El arco inhibidor</strong> de <code>carg</code> a <code>t3</code>: t3 solo está habilitada si <span class="formula">M(carg) = 0</span>. Es la regla 3 escrita directamente en la red.</li>
+<li><strong>Los invariantes</strong>, que se ven en todos los marcados del grafo:
+<ul>
+<li><span class="formula">lib + carg = 2</span>: nunca hay más de 2 cargando (regla 1).</li>
+<li><span class="formula">cupo + carg + fin = 4</span>: t3 necesita <span class="formula">fin = 4</span>, y eso fuerza <span class="formula">carg = 0</span> y <span class="formula">cupo = 0</span>. Cuando hay que hacer mantenimiento, la estación ya está vacía y no se pueden iniciar cargas nuevas (regla 2).</li>
+<li><span class="formula">esp + carg = 3</span>: los vehículos no se crean ni se pierden.</li>
+</ul></li>
+</ul>
+<p>Por la atomicidad del disparo, entre que t3 "mira" <code>carg</code> y lo ejecuta no puede colarse un t1. Es la misma garantía que la regla 4 del enunciado.</p>
+<span class="tip">Receta para estos ejercicios: (1) cada <strong>acción atómica</strong> es una transición; (2) cada <strong>recurso o contador</strong> es un lugar con tokens: surtidores, cupo; (3) "esperar N" se modela con un <strong>arco de peso N</strong>; (4) "solo si no hay nadie" se modela con un <strong>arco inhibidor</strong>; (5) verificá con el grafo de alcance y escribí los <strong>invariantes</strong>, que son la mejor justificación.</span>`,
       },
     ],
   },
@@ -725,7 +823,25 @@ let received = rx.recv().unwrap();</span>
         title: 'Modelo de actores',
         widget: 'actors-detail',
         html: `
-<p>Modelo basado en el <strong>pasaje de mensajes</strong>. El actor es la entidad principal: son <strong>livianos</strong> (se pueden crear miles, en lugar de threads), encapsulan comportamiento y estado, y un actor supervisor puede crear actores hijo.</p>
+<p><strong>Motivación: por qué existe el modelo.</strong> Programar con estado compartido y locks tiene problemas de fondo:</p>
+<ul>
+<li>Es fácil equivocarse: <strong>race conditions</strong> si falta un lock, <strong>deadlocks</strong> si se toman en distinto orden, y es muy difícil razonar sobre todos los entrelazados posibles.</li>
+<li>Los locks <strong>no componen</strong>: dos módulos correctos por separado pueden trabarse al usarse juntos.</li>
+<li>Los locks <strong>serializan</strong>: con muchos núcleos, los hilos pasan más tiempo esperando el lock que trabajando.</li>
+<li>No sirve para <strong>sistemas distribuidos</strong>: entre máquinas distintas no hay memoria compartida donde poner un lock.</li>
+</ul>
+<p>La propuesta del modelo de actores (Hewitt, 1973): armar el sistema con entidades independientes que <strong>no comparten nada</strong> y solo se comunican con <strong>mensajes asincrónicos</strong>. Sin memoria compartida no hay secciones críticas que proteger ni locks que olvidar. Además:</p>
+<ul>
+<li>El mismo modelo sirve en <strong>una máquina o en muchas</strong>: le mandás un mensaje a una <em>dirección</em>, sin importar dónde está el actor (transparencia de ubicación).</li>
+<li><strong>Escala</strong>: los actores son tan livianos que se pueden tener miles o millones.</li>
+<li><strong>Tolerancia a fallas</strong>: si un actor falla, su supervisor decide qué hacer (reiniciarlo, frenarlo). Es la filosofía "let it crash" de Erlang y Akka.</li>
+</ul>
+<p><strong>Las entidades actor.</strong> El actor es la entidad principal del modelo, basado en el <strong>pasaje de mensajes</strong>: son <strong>livianos</strong> (se pueden crear miles, en lugar de threads), encapsulan comportamiento y estado, y un actor supervisor puede crear actores hijo. Ante cada mensaje que recibe, un actor solo puede hacer tres cosas:</p>
+<ol>
+<li><strong>Enviar mensajes</strong> a otros actores cuya dirección conoce.</li>
+<li><strong>Crear actores</strong> nuevos.</li>
+<li><strong>Definir cómo va a tratar el próximo mensaje</strong>, o sea cambiar su estado interno.</li>
+</ol>
 <p>Está compuesto por:</p>
 <ul>
 <li><strong>Dirección</strong>: adonde enviarle mensajes. Es su "nombre" o ID.</li>
@@ -742,7 +858,14 @@ let received = rx.recv().unwrap();</span>
       {
         title: 'Actores en Rust: Actix',
         html: `
-<p><strong>Actix</strong> usa <strong>Tokio</strong> (runtime asincrónico) y futures. Tiene un <strong>Arbiter</strong>: corre un <em>event loop</em> interno, aloja uno o más actores (son livianos) y administra tareas asincrónicas como futures, timers y el envío de mensajes entre actores. Cada actor se ejecuta en un contexto de ejecución <code>Context&lt;A&gt;</code> que gestiona su casilla de mensajes, ejecuta su lógica y puede detenerse o reiniciarse.</p>
+<p><strong>Actix</strong> usa <strong>Tokio</strong> (runtime asincrónico) y futures. Cada actor se ejecuta en un contexto de ejecución <code>Context&lt;A&gt;</code> que gestiona su casilla de mensajes, ejecuta su lógica y puede detenerse o reiniciarse.</p>
+<p><strong>¿Qué es un Arbiter?</strong> Es <strong>un thread del sistema operativo con su propio event loop</strong> (un executor de futures). Los actores no tienen un hilo cada uno: viven <strong>dentro de un Arbiter</strong>, que aloja uno o más actores y administra sus tareas asincrónicas: futures, timers y el envío de mensajes entre actores.</p>
+<ul>
+<li>Al arrancar el sistema (<code>System::new()</code> o <code>#[actix::main]</code>) se crea el <strong>System Arbiter</strong>, el principal. Un <code>.start()</code> común pone al actor ahí.</li>
+<li><code>Arbiter::new()</code> crea <strong>otro thread</strong> con su propio event loop. Con <code>Actor::start_in_arbiter(&amp;arbiter.handle(), …)</code> se arranca un actor en ese hilo.</li>
+<li><code>SyncArbiter::start(n, || MiActor)</code> arma un <strong>pool de n threads</strong> para actores <strong>sincrónicos</strong> (con <code>SyncContext</code>), pensados para trabajo bloqueante o de CPU.</li>
+</ul>
+<p><strong>¿Para qué se usa?</strong> Para decidir <strong>en qué hilo corre cada actor</strong>. Todos los actores de un mismo Arbiter comparten un solo thread: hay concurrencia, pero no paralelismo. Para aprovechar varios núcleos se reparten los actores en varios Arbiters. Y los que hacen trabajo pesado se mandan a un SyncArbiter, así no traban el event loop de los demás.</p>
 <p><strong>Para crear un actor:</strong></p>
 <ol>
 <li>Crear una estructura (struct) para representar al actor.</li>
@@ -794,6 +917,13 @@ let received = rx.recv().unwrap();</span>
 <tr><td>Escalabilidad</td><td>Excelente: puede manejar <strong>miles/millones</strong> de tareas</td><td>Limitada: decenas/miles de threads</td></tr>
 <tr><td>Bloqueo de recursos</td><td>Evita bloqueos si se usa correctamente</td><td>Bloqueo común (mutex, semáforos, etc.)</td></tr>
 <tr><td>Consumo de CPU inactivo</td><td>Muy bajo (espera sin bloquear)</td><td>Puede desperdiciar CPU si hay threads bloqueados</td></tr>
+</table></div>
+<p><strong>Ventajas y desventajas de cada modelo:</strong></p>
+<div class="tablewrap"><table>
+<tr><th></th><th>Async (tareas)</th><th>Threads del SO</th></tr>
+<tr><td>Ventajas</td><td>Muy livianas: miles o millones de tareas con poca memoria. Crearlas y cambiar entre ellas es barato, porque no pasa por el SO. Mientras esperan I/O no ocupan un hilo. El código se parece al sincrónico.</td><td><strong>Paralelismo real</strong>: aprovechan todos los núcleos. Son <strong>preemptivos</strong>: el SO le saca la CPU a un hilo aunque no ceda, así que uno lento no traba a los demás. Código más simple, sin <code>async</code>/<code>await</code>, sin Pin y sin executor. Cualquier biblioteca bloqueante funciona.</td></tr>
+<tr><td>Desventajas</td><td><strong>Cooperativo</strong>: solo se cambia de tarea en un <code>.await</code>. Un cálculo largo o una llamada bloqueante <strong>congela al executor</strong> y a todas sus tareas. No aporta nada para trabajo de CPU. Suma complejidad: futures, Pin, <code>'static</code>, y hace falta un runtime y bibliotecas async.</td><td>Caros en memoria (stack de 20–100 KB) y lentos de crear. Cambiar de contexto pasa por el SO. Con miles de conexiones no escala: la mayoría de los hilos pasa el tiempo bloqueada esperando. Comparten memoria, así que traen race conditions y locks.</td></tr>
+<tr><td>Ejemplo de uso</td><td>Un servidor web o de chat con miles de conexiones abiertas, un crawler que hace muchas requests HTTP, un proxy. Todo eso es mucho I/O y poco cálculo.</td><td>Procesar imágenes, multiplicar matrices, comprimir archivos, el wordcount en paralelo. Todo eso es mucho cálculo, que se reparte entre núcleos (o con rayon).</td></tr>
 </table></div>
 <span class="tip">Para I/O masivo, async gana por varios órdenes de magnitud. Para cómputo intensivo (CPU-bound), los threads siguen siendo la herramienta: async no te da más cores.</span>`,
       },
@@ -960,7 +1090,19 @@ let socket = TcpStream::connect("localhost:8080")?;</span>
         title: 'Exclusión mutua distribuida',
         widget: 'distmutex-detail',
         html: `
-<p>El mismo problema de la sección crítica, sin memoria compartida. Los tres enfoques clásicos:</p>
+<p>El mismo problema de la sección crítica, sin memoria compartida. Hay que seguir garantizando lo mismo que en una sola máquina: <strong>a lo sumo un proceso en la sección crítica</strong> (safety), <strong>sin deadlock ni starvation</strong> (liveness) y, en lo posible, atendiendo los pedidos en orden.</p>
+<p><strong>Por qué es más difícil que en una sola computadora:</strong></p>
+<ul>
+<li><strong>No hay memoria compartida</strong>: no hay un lock ni una variable que todos puedan ver, ni instrucciones atómicas (test-and-set) que los coordinen. Todo acuerdo se arma con mensajes.</li>
+<li><strong>No hay reloj global</strong>: para decidir "quién pidió primero" no alcanza con la hora de cada máquina. Hacen falta relojes lógicos (Lamport) para ordenar los pedidos.</li>
+<li><strong>Los mensajes son poco confiables</strong>: tienen demoras variables y pueden perderse, duplicarse o llegar desordenados. Un permiso puede llegar tarde o no llegar nunca.</li>
+<li><strong>Fallas parciales</strong>: un proceso, el coordinador o el que tiene el token pueden caerse mientras el resto sigue andando. Si el que se cae estaba en la sección crítica, hay que detectarlo y recuperar el recurso.</li>
+<li><strong>Un proceso lento es indistinguible de uno caído</strong>: la única herramienta es el timeout, y es imperfecta. Si se elige mal, se declara muerto a un proceso vivo.</li>
+<li><strong>Conocimiento parcial</strong>: cada proceso solo conoce su estado local y lo que le llega por mensajes. Nadie tiene la foto global: cuántos procesos hay, quién está adentro, quién está esperando.</li>
+<li><strong>Costo de comunicación</strong>: en una máquina, entrar a la sección crítica es una instrucción atómica. Acá cuesta varios mensajes (3, 2(n − 1), …) y la latencia de la red.</li>
+<li><strong>Grupo dinámico y particiones</strong>: los procesos entran y salen del grupo, y si la red se parte, cada mitad puede creer que el otro lado se cayó. Así pueden terminar dos procesos en la sección crítica.</li>
+</ul>
+<p>Los tres enfoques clásicos:</p>
 <ul>
 <li><strong>Centralizado</strong> (<code>centralizedmutex.rs</code>): un coordinador con una cola. REQUEST → GRANT → RELEASE: solo <strong>3 mensajes por acceso</strong>, orden justo. Contras: cuello de botella y <strong>single point of failure</strong>.</li>
 <li><strong>Token ring</strong> (<code>tokenring.rs</code>): un único <strong>token</strong> circula por el anillo; solo su portador entra a la CS. No hay coordinador ni starvation (el token pasa por todos). Contras: mensajes constantes aunque nadie quiera entrar, y si el portador muere hay que <strong>detectar y regenerar el token</strong> (garantizando que no queden dos).</li>
@@ -1073,7 +1215,34 @@ let socket = TcpStream::connect("localhost:8080")?;</span>
 <li>Si es <strong>mayor</strong>, la transacción está en orden y se procede con la operación.</li>
 <li>Si es <strong>menor</strong>, la transacción <strong>se aborta</strong> (es más vieja que la última modificación del archivo).</li>
 </ul>
+<p>El efecto es que las transacciones quedan serializadas <strong>en el orden de sus timestamps</strong>: la que llega tarde a un dato que ya tocó una más nueva, no espera, aborta y vuelve a empezar con un timestamp nuevo.</p>
+<ul>
+<li><strong>Ventajas</strong>: <strong>libre de deadlocks</strong>, porque nadie espera a nadie: la operación procede o la transacción aborta. No hay locks que tomar ni liberar. Garantiza serializabilidad sin un coordinador de locks.</li>
+<li><strong>Desventajas</strong>: con <strong>mucha contención</strong> aborta seguido. Si muchas transacciones tocan el mismo dato, las que llegan "tarde" abortan y reintentan una y otra vez. Hay que guardar y comparar dos timestamps <strong>por cada dato</strong>. Necesita timestamps <strong>únicos y globales</strong> (Lamport). Y si una transacción lee un dato escrito por otra que después aborta, hay que abortarla también (<strong>abortos en cascada</strong>), salvo en la variante estricta.</li>
+</ul>
 <span class="tip">La concurrencia optimista conviene cuando hay una proporción mucho más grande de <strong>consultas que de modificaciones</strong>, porque casi nunca se intentan editar los mismos archivos — y entonces casi nunca se paga el costo de rehacer.</span>`,
+      },
+      {
+        title: 'Cuál elegir: 2PL, timestamps u optimista',
+        html: `
+<p>Los tres garantizan transacciones <strong>serializables</strong>. Lo que cambia es <strong>cuándo detectan un conflicto</strong> y <strong>qué hacen</strong> con él:</p>
+<div class="tablewrap"><table>
+<tr><th></th><th>2PL (pesimista)</th><th>Timestamps</th><th>Optimista</th></tr>
+<tr><td>Cuándo detecta el conflicto</td><td><strong>Antes</strong>: al pedir el lock</td><td><strong>Durante</strong>: en cada lectura o escritura</td><td><strong>Al final</strong>: en la validación del commit</td></tr>
+<tr><td>Qué hace ante un conflicto</td><td><strong>Espera</strong> a que se libere el lock</td><td><strong>Aborta</strong> y reinicia con otro timestamp</td><td><strong>Aborta</strong> y rehace todo</td></tr>
+<tr><td>Deadlock</td><td><strong>Puede ocurrir</strong>: hay que detectarlo o prevenirlo</td><td>No (nadie espera)</td><td>No (nadie espera)</td></tr>
+<tr><td>Costo sin conflictos</td><td>Tomar y liberar locks, incluso si nadie compite</td><td>Mantener y comparar timestamps por dato</td><td><strong>Casi nulo</strong>: solo valida al final</td></tr>
+<tr><td>Costo con muchos conflictos</td><td>Esperas: baja el throughput, pero <strong>no se pierde trabajo</strong></td><td>Muchos abortos y reintentos</td><td>Muchísimos abortos: <strong>se tira todo el trabajo hecho</strong></td></tr>
+<tr><td>Ideal para</td><td>Alta contención, sobre todo de escrituras a los mismos datos</td><td>Contención baja o media, cuando no se quiere esperar ni arriesgar deadlocks</td><td>Muchas más lecturas que escrituras y pocos conflictos</td></tr>
+</table></div>
+<p><strong>La variable clave es la contención</strong>, o sea qué tan seguido dos transacciones quieren el mismo dato al mismo tiempo:</p>
+<ul>
+<li><strong>Contención baja</strong>: gana el <strong>optimista</strong>. No paga locks y casi nunca aborta.</li>
+<li><strong>Contención alta con escrituras</strong> (muchos clientes peleando por los mismos datos en un horario pico): el optimista y los timestamps <strong>degeneran</strong>. Casi todas las transacciones abortan y se reintentan, y esos reintentos agregan más carga justo en el pico: es un efecto bola de nieve. Con <strong>2PL</strong> las transacciones hacen fila en vez de rehacer trabajo, y el throughput es más estable.</li>
+<li>Si se elige 2PL hay que acompañarlo con <strong>manejo de deadlocks</strong> (wait-die, wound-wait o timeouts) y con <strong>transacciones cortas</strong>: tomar los locks lo más tarde posible y solo sobre lo necesario, así se retienen menos tiempo. La variante <strong>estricta</strong> además evita que otra transacción lea datos que después se deshacen.</li>
+<li>También se pueden <strong>combinar</strong>: las lecturas que solo consultan van sin locks (optimista o con versiones), y las escrituras que se pisan van con locks.</li>
+</ul>
+<span class="tip">En un ejercicio de diseño, justificá con el contexto: <strong>proporción de lecturas y escrituras</strong>, <strong>probabilidad de conflicto</strong> (¿muchos quieren el mismo dato a la vez?) y <strong>cuánto cuesta un aborto</strong> (¿cuánto trabajo se pierde y cuánto se tarda en reintentar?). Muchos conflictos → pesimista. Pocos → optimista.</span>`,
       },
       {
         title: 'Transacciones distribuidas: two-phase commit',
@@ -1091,10 +1260,73 @@ let socket = TcpStream::connect("localhost:8080")?;</span>
 <span class="warn">La debilidad famosa: 2PC es <strong>BLOQUEANTE</strong>. Si el coordinador muere después de juntar los votos y antes de comunicar la decisión, los participantes inciertos quedan clavados (con locks) hasta que vuelva. Por eso existen 3PC y los protocolos de consenso (Paxos/Raft) — probalo en la simulación.</span>`,
       },
       {
+        title: 'Ejercicio de final resuelto: compra de pasajes con 2PL',
+        html: `
+<p><strong>Planteo</strong> (tipo final): una aerolínea vende pasajes online. Comprar implica <strong>reservar el asiento</strong> en el sistema de vuelos y <strong>cobrarle al cliente</strong> en el sistema de pagos, que debita su cuenta y acredita a la aerolínea. Muchos clientes compran al mismo tiempo. Se pide una solución con un modelo de transacciones usando <strong>two-phase locking</strong>.</p>
+<p><strong>Qué puede salir mal sin control de concurrencia:</strong></p>
+<ul>
+<li><strong>Overbooking</strong>: dos clientes ven el asiento 12A libre, los dos lo compran y el último pisa al primero (un <em>lost update</em>).</li>
+<li><strong>Estado a medias</strong>: se reserva el asiento pero el cobro falla, o se cobra y no queda asiento.</li>
+<li><strong>Saldo inconsistente</strong>: dos compras del mismo cliente leen el mismo saldo y debitan una sola vez.</li>
+</ul>
+<p><strong>1 · La transacción con 2PL estricto</strong> (en un solo sistema, para empezar):</p>
+<span class="rust">comprar(cliente, vuelo, nro, precio):
+  BEGIN TRANSACTION
+
+  // fase de expansión: se toman TODOS los locks, en orden global
+  write_lock(asiento[vuelo, nro])
+  write_lock(cuenta[cliente])
+  write_lock(cuenta[aerolinea])
+  // locked point: ya no se toma ningún lock más
+
+  if asiento[vuelo, nro].estado != LIBRE:  ABORT   // otro lo compró antes
+  if cuenta[cliente].saldo &lt; precio:       ABORT   // sin fondos
+
+  asiento[vuelo, nro].estado   = VENDIDO
+  asiento[vuelo, nro].pasajero = cliente
+  cuenta[cliente].saldo   -= precio
+  cuenta[aerolinea].saldo += precio
+
+  END TRANSACTION   // commit: se escribe en el log (WAL)
+
+  // fase de contracción: en 2PL ESTRICTO recién después del commit
+  unlock(asiento[vuelo, nro], cuenta[cliente], cuenta[aerolinea])</span>
+<p>Si hay <code>ABORT</code>, se deshacen los cambios leyendo el log hacia atrás y se liberan los locks.</p>
+<p><strong>Por qué funciona:</strong></p>
+<ul>
+<li>Si dos clientes quieren el 12A, el segundo <strong>se bloquea</strong> en <code>write_lock</code> hasta que el primero hace commit. Al entrar ve el asiento <code>VENDIDO</code> y aborta: no hay overbooking. El chequeo de "está libre" se hace <strong>con el lock tomado</strong>, nunca antes.</li>
+<li>2PL garantiza que las transacciones son <strong>serializables</strong>: el resultado es el mismo que si las compras se hubieran hecho de a una, en el orden de sus locked points.</li>
+<li>Ser <strong>estricto</strong> (liberar después del commit) evita que otra transacción lea un asiento "vendido" por una compra que después aborta, porque se le rechazó el pago. Así no hay lecturas sucias ni abortos en cascada.</li>
+<li>Se toma el <strong>write lock directamente</strong> sobre el asiento. Si dos transacciones tomaran un read lock para mirar y después quisieran pasarlo a write, se esperarían mutuamente: es el deadlock clásico de la conversión de locks.</li>
+</ul>
+<p><strong>2 · Deadlocks.</strong> 2PL no los evita. Si una familia compra 12A y 12B mientras otra compra 12B y 12A, cada una toma un asiento y espera el otro. Hay tres formas de manejarlo:</p>
+<ul>
+<li><strong>Orden global de locks</strong>, la más simple: siempre asientos antes que cuentas, los asientos ordenados por número y las cuentas por id. Así se rompe la espera circular de Coffman.</li>
+<li><strong>Wait-die o wound-wait</strong> con timestamps, si no se puede saber de antemano qué locks se van a necesitar.</li>
+<li><strong>Timeout</strong>: si se espera un lock demasiado tiempo, se aborta y se reintenta.</li>
+</ul>
+<p><strong>3 · Granularidad.</strong> Se lockea <strong>cada asiento</strong>, no el vuelo entero: un lock por vuelo serializaría todas las compras de ese vuelo aunque sean asientos distintos. Las consultas del tipo "mostrar el mapa de asientos" pueden leer sin lock, o con read locks compartidos. Lo importante es que la compra <strong>vuelve a chequear</strong> con el write lock tomado.</p>
+<p><strong>4 · El pago está en otro sistema: 2PL + 2PC.</strong> Si vuelos y pagos son sistemas distintos, cada uno aplica 2PL sobre sus propios datos. Para que el asiento y el cobro se confirmen <strong>los dos o ninguno</strong>, el servicio de compras coordina con <strong>two-phase commit</strong>:</p>
+<ol>
+<li><strong>PREPARE</strong> a los dos. Vuelos toma el lock del asiento, chequea que esté libre, deja la reserva escrita en su log y vota SÍ. Pagos toma el lock de la cuenta, chequea los fondos, lo escribe en su log y vota SÍ. Los dos <strong>se quedan con los locks</strong>.</li>
+<li>Si los dos votaron SÍ → <strong>COMMIT</strong>: cada uno aplica los cambios y recién ahí libera los locks (2PL estricto). Si alguno votó NO o no respondió → <strong>ABORT</strong>: los dos deshacen y liberan.</li>
+</ol>
+<span class="warn">El costo de combinarlos: entre el voto y la decisión, el asiento y la cuenta quedan <strong>bloqueados</strong>. Si el coordinador se cae en ese momento, el asiento queda trabado hasta que vuelva (2PC es bloqueante). Por eso las transacciones tienen que ser cortas, y en la práctica se agregan timeouts.</span>
+<span class="tip">Por qué 2PL y no optimista acá: en una venta con mucha demanda (un hot sale, un vuelo que se agota) muchos clientes pelean por los mismos asientos. Con control optimista casi todas las compras abortarían en la validación y se reintentarían. Con 2PL hacen fila y la que llega tarde se entera enseguida de que el asiento ya no está.</span>`,
+      },
+      {
         title: 'Deadlock distribuido',
         widget: 'waitgraph-detail',
         html: `
-<p>Con transacciones tomando locks en varios nodos, el deadlock reaparece — pero ahora <strong>nadie ve el grafo de espera completo</strong>: cada nodo conoce solo sus aristas. Estrategias:</p>
+<p>Con transacciones tomando locks en varios nodos, el deadlock reaparece — pero ahora <strong>nadie ve el grafo de espera completo</strong>: cada nodo conoce solo sus aristas. Las dificultades que se suman respecto de una sola máquina:</p>
+<ul>
+<li>El ciclo puede estar <strong>repartido entre varios nodos</strong>: cada uno ve un pedazo que, mirado solo, no tiene ciclo.</li>
+<li>La información viaja con <strong>demora y desordenada</strong>: lo que un nodo sabe de los otros puede estar desactualizado. Eso genera <strong>falsos deadlocks</strong> (ciclos que ya no existen) o hace que se escapen ciclos reales.</li>
+<li>No hay reloj global para ordenar los eventos de los distintos nodos.</li>
+<li>Los nodos y la red pueden fallar: un nodo que no responde puede parecer bloqueado.</li>
+<li>Detectar cuesta mensajes, y la víctima a abortar tiene que elegirse de forma <strong>consistente</strong>, para no abortar dos transacciones por el mismo ciclo.</li>
+</ul>
+<p>Estrategias:</p>
 <ul>
 <li><strong>Detección</strong>: construir el grafo global (un detector central que junta los grafos locales, o <em>edge chasing</em>: mensajes <em>probe</em> que siguen las cadenas de espera; si tu probe te vuelve, hay ciclo → abortás una transacción víctima).</li>
 <li><strong>Prevención por timestamps</strong>: wait-die y wound-wait. Están desarrollados con su animación en el tema siguiente.</li>
@@ -1102,6 +1334,14 @@ let socket = TcpStream::connect("localhost:8080")?;</span>
 </ul>
 <p><strong>Detección centralizada</strong>: el proceso coordinador mantiene el grafo de uso de recursos; los procesos le envían mensajes cuando obtienen/liberan un recurso y él actualiza el grafo. <strong>El deadlock ocurre cuando se presenta un ciclo</strong>. Problema: los mensajes pueden llegar desordenados y generar <strong>falsos deadlocks</strong> (posible solución: timestamps globales de Lamport).</p>
 <p><strong>Detección distribuida</strong>: cuando un proceso debe esperar por un recurso, envía un <em>probe message</em> al proceso que lo tiene. El mensaje contiene: id del proceso que se bloquea, id del que envía y del destinatario. Al recibirlo, el proceso actualiza el id del proceso que envía y el id del destinatario, y lo reenvía a los procesos que tienen el recurso que necesita. <strong>Si el mensaje vuelve al proceso original, hay un ciclo en el grafo.</strong> Ventaja: no hay coordinador → no hay single point of failure.</p>
+<p><strong>Comparación: ventajas, desventajas y cuándo conviene cada uno</strong></p>
+<div class="tablewrap"><table>
+<tr><th></th><th>Centralizado</th><th>Distribuido (probes)</th></tr>
+<tr><td>Ventajas</td><td><strong>Simple</strong> de implementar. El coordinador tiene la <strong>foto completa</strong> y encuentra cualquier ciclo recorriendo el grafo. Es fácil elegir una única víctima.</td><td><strong>Sin single point of failure</strong> ni cuello de botella: la carga se reparte. Solo genera mensajes cuando alguien se bloquea.</td></tr>
+<tr><td>Desventajas</td><td><strong>Single point of failure</strong>: si cae el coordinador, nadie detecta nada. Es un <strong>cuello de botella</strong>, porque todos le avisan cada lock que toman y liberan. Da <strong>falsos deadlocks</strong> si los mensajes llegan desordenados.</td><td><strong>Más complejo</strong>. Con cadenas de espera largas, los probes generan muchos mensajes. Varios procesos pueden detectar el mismo ciclo a la vez y abortar de más. Si un lock se libera mientras viaja el probe, puede reportar un ciclo que ya no existe.</td></tr>
+<tr><td>Cuándo conviene</td><td>Sistemas chicos o medianos, con un nodo confiable o replicado, donde los deadlocks son raros. Ejemplo: una base de datos con un administrador de locks central.</td><td>Sistemas grandes, sin un nodo en el que se pueda confiar, que necesitan alta disponibilidad.</td></tr>
+</table></div>
+<span class="tip">Más allá de cuál detector usar: si los deadlocks son <strong>muy frecuentes</strong> conviene <strong>prevenirlos</strong> (wait-die o wound-wait) en vez de detectarlos. Si son <strong>rarísimos</strong>, un <strong>timeout</strong> suele alcanzar.</span>
 <span class="tip">Conexión con Coffman: todas estas técnicas atacan la <strong>espera circular</strong>, igual que el orden global de recursos en los filósofos — pero acá el ciclo hay que descubrirlo (o prevenirlo) con mensajes, porque no hay memoria compartida donde mirarlo.</span>`,
       },
       {
