@@ -116,7 +116,17 @@ export const SECTIONS: Section[] = [
 <tr><td>Fallos</td><td>Si uno muere, no afecta a los otros</td><td>Si uno falla, puede tumbar todo el proceso</td></tr>
 </table></div>
 <p>Los threads comparten el <strong>heap</strong> y los segmentos de memoria global del proceso, pero cada uno tiene su <strong>propio stack</strong> (variables locales, dirección de retorno, temporales) y su contexto de ejecución independiente — por eso necesitan <strong>context switching</strong>.</p>
-<span class="warn">Que dos threads <em>lean</em> al mismo tiempo no es problema. El problema aparece apenas uno <strong>escribe</strong> mientras otro lee: ahí compartir el heap exige <strong>sincronización explícita</strong>.</span>`,
+<span class="warn">Que dos threads <em>lean</em> al mismo tiempo no es problema. El problema aparece apenas uno <strong>escribe</strong> mientras otro lee: ahí compartir el heap exige <strong>sincronización explícita</strong>.</span>
+<p><strong>Estados de ejecución de un proceso.</strong> El scheduler lo mueve entre cinco estados, según haya CPU libre y según los eventos del sistema:</p>
+<ul>
+<li><strong>Nuevo</strong>: se está creando.</li>
+<li><strong>Listo</strong> (ready): podría ejecutar, está esperando que le den la CPU.</li>
+<li><strong>En ejecución</strong> (running): tiene la CPU.</li>
+<li><strong>Bloqueado</strong> (en espera): espera un evento, como que termine una operación de I/O, que se libere un lock o que le hagan signal a un semáforo. Aunque haya CPU libre, no puede correr.</li>
+<li><strong>Terminado</strong>: terminó, por decisión propia (<code>exit</code>) o porque otro proceso lo terminó.</li>
+</ul>
+<p>Un proceso que hace <code>exit</code> no desaparece enseguida: queda <strong>zombie</strong>. Ya liberó sus recursos, pero su entrada sigue en la tabla de procesos hasta que el padre lee su código de salida (con <code>wait</code>).</p>
+<span class="tip">Esto conecta con toda la materia: un <code>wait</code> de semáforo, un <code>lock()</code> ocupado o un <code>recv()</code> sin mensajes pasan al proceso a <strong>bloqueado</strong>, y el <code>signal</code>, <code>unlock</code> o <code>send</code> correspondiente lo devuelve a <strong>listo</strong>. El busy waiting, en cambio, se queda en <strong>ejecución</strong> gastando CPU para nada.</span>`,
       },
       {
         title: 'Preemptivo vs colaborativo',
@@ -187,7 +197,14 @@ let resultado = handle.join().unwrap(); // espera y recupera el valor</span>
 </ul>
 <p><strong>La gran ventaja</strong>: no requiere sincronización y es <strong>determinístico</strong>. No hay race conditions porque las tareas no compiten por recursos; los threads están aislados y el programa produce el mismo resultado independientemente de la velocidad de cada uno.</p>
 <p>Ejemplos de la materia: <code>mergesort.rs</code> (cada mitad se ordena en un hilo y el merge es el join) y <code>wordcountpar.rs</code> (cada hilo cuenta un pedazo del archivo y al final se suman los HashMap).</p>
-<p>Performance ideal: <span class="formula">t(secuencial) / N(threads)</span>. Puede desviarse si hay una tarea grande y otra chica, más el costo del procesamiento de combinación.</p>`,
+<p>Performance ideal: <span class="formula">t(secuencial) / N(threads)</span>, o sea un speedup lineal. Puede desviarse si hay una tarea grande y otra chica, más el costo del procesamiento de combinación.</p>
+<p><strong>Desventajas del modelo:</strong></p>
+<ul>
+<li><strong>Solo sirve para algunos problemas</strong>: los que se pueden partir en subtareas independientes. Si las subtareas necesitan datos unas de otras, no aplica.</li>
+<li><strong>Tareas desbalanceadas</strong>: el join espera a la más lenta. Si una subtarea es mucho más pesada que las demás, los otros threads quedan ociosos (work stealing lo mitiga).</li>
+<li><strong>Costo de partir y de juntar</strong>: crear subtareas y combinar resultados no es gratis. Si se parte demasiado fino, ese costo supera la ganancia.</li>
+</ul>
+<p>Ejemplo típico de uso: procesar muchas imágenes o archivos de forma independiente, y al final juntar los resultados.</p>`,
       },
       {
         title: 'Work stealing',
@@ -315,7 +332,15 @@ let s = ['a','b','c','d','e'].par_iter()
 <li><strong>Safety</strong> ("nunca pasa algo malo"): debe ser verdadera <strong>siempre</strong>, en todo momento de la ejecución. Ejemplos: <strong>exclusión mutua</strong> (dos procesos no ejecutan la sección crítica a la vez) y <strong>ausencia de deadlock</strong> (los procesos no quedan esperando entre sí indefinidamente).</li>
 <li><strong>Liveness</strong> ("eventualmente pasa algo bueno"): garantiza que el sistema <strong>progresa</strong>, que no queda colgado ni congelado. Ejemplos: <strong>ausencia de starvation</strong> (si un proceso está listo para usar un recurso, en algún momento accede) y <strong>fairness</strong> (si una instrucción está siempre habilitada, en algún momento se ejecuta: ningún proceso queda excluido o postergado indefinidamente).</li>
 </ul>
-<span class="tip">Una regla práctica para distinguirlas: una propiedad de <em>safety</em> se puede violar en un <strong>instante concreto</strong> (podés señalar el momento exacto en que se rompió). Una de <em>liveness</em> solo se viola en una <strong>ejecución infinita</strong> (nunca podés decir "acá se rompió", solo "nunca pasó").</span>`,
+<span class="tip">Una regla práctica para distinguirlas: una propiedad de <em>safety</em> se puede violar en un <strong>instante concreto</strong> (podés señalar el momento exacto en que se rompió). Una de <em>liveness</em> solo se viola en una <strong>ejecución infinita</strong> (nunca podés decir "acá se rompió", solo "nunca pasó").</span>
+<p><strong>Los cuatro problemas clásicos y sus efectos</strong> (pregunta de final):</p>
+<div class="tablewrap"><table>
+<tr><th>Problema</th><th>Qué es</th><th>Efecto negativo</th><th>Cómo se evita</th></tr>
+<tr><td><strong>Race condition</strong></td><td>Varios procesos acceden a estado compartido sin sincronizar, y el resultado depende del orden en que se intercalan.</td><td>Datos corruptos y bugs <strong>intermitentes</strong>, difíciles de reproducir. Rompe la <strong>exclusión mutua</strong> (safety).</td><td>Sección crítica protegida: Mutex, semáforos, atómicos, o no compartir (mensajes).</td></tr>
+<tr><td><strong>Deadlock</strong></td><td>Un conjunto de procesos donde cada uno espera un recurso que tiene otro del conjunto.</td><td>Esos procesos <strong>no avanzan nunca más</strong>: el sistema parece congelado. Ataca la ausencia de deadlock (safety para la cátedra).</td><td>Romper una condición de Coffman (orden global de recursos), prevenir (wait-die / wound-wait) o detectar y abortar.</td></tr>
+<tr><td><strong>Starvation</strong></td><td>Un proceso siempre queda postergado y nunca obtiene el recurso, aunque el sistema en conjunto progresa.</td><td><strong>Injusticia</strong>: ese proceso nunca termina. Rompe liveness y fairness.</td><td>Colas FIFO, prioridades por antigüedad (como los timestamps de wait-die), espera acotada.</td></tr>
+<tr><td><strong>Busy waiting</strong></td><td>Un hilo da vueltas en un loop preguntando por una condición (espera activa).</td><td><strong>Desperdicia CPU</strong> y le quita tiempo al hilo que tiene que hacer verdadera la condición. La sincronización puede ser correcta y aun así el programa anda mal.</td><td>Bloquearse en vez de preguntar: semáforos, condition variables, <code>recv()</code>, <code>await</code>.</td></tr>
+</table></div>`,
       },
       {
         title: 'Race condition: el lost update',
@@ -353,7 +378,8 @@ let s = ['a','b','c','d','e'].par_iter()
 <li><strong>Lock de lectura</strong> (shared): puede haber múltiples accediendo mientras no haya escritura.</li>
 <li><strong>Lock de escritura</strong> (exclusive): solo puede haber uno accediendo a la sección crítica.</li>
 </ul>
-<p>En UNIX se los conoce como <em>shared locks</em> y <em>exclusive locks</em>; en Rust son los dos modos de <code>RwLock</code>.</p>`,
+<p><strong>En UNIX</strong> los locks se ponen sobre <strong>archivos</strong> (<code>flock</code>, <code>fcntl</code>) y se los conoce como <em>shared locks</em> (lectura) y <em>exclusive locks</em> (escritura). Para tomar uno de lectura hay que esperar a que no haya ninguno de escritura; para tomar uno de escritura hay que esperar a que no haya ninguno de ningún tipo. Son <strong>advisory</strong> (consultivos): el SO no impide que un proceso lea o escriba el archivo sin pedir el lock, así que solo funcionan si <strong>todos los procesos respetan el protocolo</strong>.</p>
+<p><strong>En Rust</strong> los locks están en <code>std::sync</code>: <code>Mutex</code> (exclusión mutua), <code>RwLock</code> (sus dos modos, <code>read</code> y <code>write</code>, son los shared y exclusive locks) y <code>OnceLock</code> (inicializar un valor una sola vez desde varios hilos). Todos devuelven una guarda que libera el lock por <strong>RAII</strong>. A diferencia de UNIX, no son consultivos: el dato vive <em>adentro</em> del lock y el compilador no te deja tocarlo sin tomarlo.</p>`,
       },
       {
         title: 'Mutex y Arc: compartir estado de forma segura',
@@ -746,6 +772,7 @@ if wait_result.is_leader() {
 </ul></li>
 </ul>
 <p>Por la atomicidad del disparo, entre que t3 "mira" <code>carg</code> y lo ejecuta no puede colarse un t1. Es la misma garantía que la regla 4 del enunciado.</p>
+<p><strong>Variante de otro final:</strong> técnicos que hacen diagnósticos sobre una base de datos, hasta <strong>3 a la vez</strong>; después de <strong>3 diagnósticos</strong> un ingeniero tiene que aplicar un parche, y no puede parchear mientras haya técnicos trabajando (ni viceversa). Es <strong>la misma red</strong> con otros números: <code>lib</code> = 3 lugares libres en la base, <code>cupo</code> = 3, arcos de <strong>peso 3</strong> en "aplicar parche" y el mismo inhibidor desde "diagnosticando". El "y viceversa" sale gratis: el parche exige que no haya nadie diagnosticando, y hasta que se aplica <code>cupo</code> = 0, así que no se puede iniciar ningún diagnóstico. Si el parche tuviera duración, se lo parte en "iniciar parche" → lugar "parcheando" → "terminar parche", y "iniciar diagnóstico" lleva un inhibidor desde "parcheando".</p>
 <span class="tip">Receta para estos ejercicios: (1) cada <strong>acción atómica</strong> es una transición; (2) cada <strong>recurso o contador</strong> es un lugar con tokens: surtidores, cupo; (3) "esperar N" se modela con un <strong>arco de peso N</strong>; (4) "solo si no hay nadie" se modela con un <strong>arco inhibidor</strong>; (5) verificá con el grafo de alcance y escribí los <strong>invariantes</strong>, que son la mejor justificación.</span>`,
       },
     ],
@@ -1064,7 +1091,27 @@ for stream in listener.incoming() {
 }
 // cliente
 let socket = TcpStream::connect("localhost:8080")?;</span>
-<span class="warn">El <strong>cierre de conexión en TCP es unilateral</strong>: cualquiera de los dos extremos puede enviar un mensaje de cierre, y cada parte decide cerrar la conexión de su lado. Por eso se hace close → se recibe close ACK ← se envía close ← y se envía un último ACK →. En Rust, la conexión se cierra cuando el <code>TcpStream</code> se dropea (<code>shutdown()</code> permite cerrar solo escritura, solo lectura, o ambas).</span>`,
+<span class="warn">El <strong>cierre de conexión en TCP es unilateral</strong>: cualquiera de los dos extremos puede enviar un mensaje de cierre, y cada parte decide cerrar la conexión de su lado. Por eso se hace close → se recibe close ACK ← se envía close ← y se envía un último ACK →. En Rust, la conexión se cierra cuando el <code>TcpStream</code> se dropea (<code>shutdown()</code> permite cerrar solo escritura, solo lectura, o ambas).</span>
+<p><strong>¿Qué es un socket?</strong> Una abstracción que da el sistema operativo para mandar y recibir datos entre procesos, en la misma máquina o por la red. Una conexión queda identificada por <em>(IP origen, puerto origen, IP destino, puerto destino, protocolo)</em>.</p>
+<p><strong>¿Qué modelo de concurrencia usan?</strong> El socket en sí no impone ninguno: es el servidor el que decide cómo atender muchas conexiones a la vez. Las opciones son justamente los modelos de la materia:</p>
+<ul>
+<li><strong>Un thread por conexión</strong>: el <code>for stream in listener.incoming()</code> de arriba con un <code>thread::spawn</code> por cliente. Es simple, pero no escala a miles de clientes (cada hilo tiene su stack).</li>
+<li><strong>Pool de threads</strong>: una cantidad fija de hilos que se reparten las conexiones. Acota la memoria, pero un cliente lento ocupa un hilo entero.</li>
+<li><strong>Asincrónico</strong> (event loop): una tarea por conexión sobre pocos hilos, que se suspende en cada lectura o escritura. Es lo que más escala con mucho I/O.</li>
+<li><strong>Actores</strong>: cada conexión o sesión es un actor que recibe mensajes. Así se arma típicamente un servidor de chat con Actix.</li>
+</ul>
+<p><strong>El modelo OSI.</strong> Divide el problema de "comunicar dos aplicaciones" en <strong>7 capas</strong>. Cada una usa los servicios de la de abajo y le ofrece servicios a la de arriba, así se puede cambiar cómo funciona una capa sin tocar las demás:</p>
+<div class="tablewrap"><table>
+<tr><th>Capa</th><th>Objetivo</th><th>Capacidades / ejemplos</th></tr>
+<tr><td>7 · Aplicación</td><td>Dar servicios de red a las aplicaciones del usuario</td><td>HTTP, FTP, SMTP, DNS</td></tr>
+<tr><td>6 · Presentación</td><td>Que los dos extremos interpreten los datos igual</td><td>Conversión de formatos, compresión, cifrado</td></tr>
+<tr><td>5 · Sesión</td><td>Administrar el diálogo entre aplicaciones</td><td>Abrir, mantener y cerrar sesiones; checkpoints y recuperación</td></tr>
+<tr><td>4 · Transporte</td><td>Comunicación extremo a extremo entre <strong>procesos</strong></td><td>Puertos, segmentación, control de flujo; TCP (confiable, ordenado) o UDP (liviano). Acá viven los sockets</td></tr>
+<tr><td>3 · Red</td><td>Llevar los paquetes hasta el destino, atravesando varias redes</td><td>Direcciones IP, ruteo, fragmentación</td></tr>
+<tr><td>2 · Enlace</td><td>Transmisión libre de errores entre dos nodos conectados físicamente</td><td>Tramas, direcciones MAC, detección de errores (CRC), acceso al medio</td></tr>
+<tr><td>1 · Física</td><td>Mandar bits por el medio físico</td><td>Voltajes, conectores, frecuencias, señales</td></tr>
+</table></div>
+<span class="tip">Para la materia, lo importante es la capa de <strong>transporte</strong>: TCP te da un flujo de bytes confiable y ordenado (por eso hay que delimitar los mensajes: serialización y protocolo), y UDP datagramas sueltos que pueden perderse o llegar desordenados (lo que usa, por ejemplo, Ricart-Agrawala).</span>`,
       },
       {
         title: 'Relojes lógicos de Lamport',
@@ -1117,6 +1164,12 @@ let socket = TcpStream::connect("localhost:8080")?;</span>
 <tr><td>Token ring</td><td>1 a ∞</td><td>0 a n − 1</td><td>Token perdido, caída de un proceso</td></tr>
 </table></div>
 <p><strong>El algoritmo centralizado es el más simple y el más eficiente.</strong> El distribuido reemplaza el single point of failure por <em>n</em> points of failure: si algún proceso cae, su silencio se interpreta incorrectamente como una <strong>denegación de permiso</strong>, bloqueando todos los intentos posteriores de entrar a la sección crítica.</p>
+<p><strong>¿Cuándo conviene cada uno?</strong></p>
+<ul>
+<li><strong>Centralizado</strong>: sistemas chicos con un servidor confiable o una infraestructura central. Ejemplo: un servidor que administra la cola de una impresora compartida en una oficina.</li>
+<li><strong>Distribuido</strong>: redes sin servidor central, como sistemas P2P o sensores que comparten una antena y se coordinan con mensajes y timestamps.</li>
+<li><strong>Token ring</strong>: redes estables con nodos fijos, como máquinas de una línea de producción que modifican un parámetro compartido por turnos.</li>
+</ul>
 <span class="warn">"¿El token ring garantiza exclusión mutua?" Sí, trivialmente: hay UN token. Las preguntas con trampa son las de fallas: ¿qué pasa si se pierde el token? ¿y si por un bug de regeneración aparecen dos?</span>`,
       },
       {
@@ -1148,6 +1201,7 @@ let socket = TcpStream::connect("localhost:8080")?;</span>
 <li><strong>Anillo</strong> (<code>ring.rs</code>): el mensaje ELECTION da la vuelta juntando ids vivos; al volver al iniciador se conoce el máximo, y una segunda vuelta (COORDINATOR) lo anuncia. Costo predecible: <strong>O(n)</strong> — unas 2n hops.</li>
 <li><strong>Bully</strong> (<code>bully.rs</code>): mandás ELECTION a todos los ids <strong>mayores</strong> que vos. Si alguno responde OK, te bajás y él sigue. El que no recibe OK se proclama con COORDINATOR. Peor caso <strong>O(n²)</strong> (inicia el más chico), mejor caso O(n). Y si un nodo con id alto revive, <strong>"apura" al líder actual</strong> y se queda con el puesto — de ahí el nombre.</li>
 </ul>
+<p><strong>¿Cuándo conviene cada uno?</strong> <strong>Bully</strong> cuando hay jerarquía entre los nodos y se quiere que gane rápido el de mayor capacidad (data centers, clusters), aunque genere más tráfico. <strong>Anillo</strong> cuando la red es chica y estable, con topología fija y poco consumo (sensores): usa pocos mensajes, aunque tarda más y depende de que el anillo esté sano. En los dos, si varios procesos arrancan una elección a la vez, no pasa nada: terminan convergiendo al mismo líder.</p>
 <span class="tip">Pregunta clásica: ¿pueden quedar DOS líderes? Con partición de red (o timeouts mal calibrados), sí — cada mitad elige el suyo. Los algoritmos de la materia asumen fallas limpias (crash-stop) y red confiable; el caso general es el problema de consenso.</span>`,
       },
       {
@@ -1208,6 +1262,7 @@ let socket = TcpStream::connect("localhost:8080")?;</span>
         html: `
 <p><strong>Concurrencia optimista</strong> (el modelo de GitHub). Los cambios se hacen <strong>sin lockeos</strong>, porque se asume que no va a haber conflictos. El proceso modifica los archivos sin ningún control; al commitear <strong>se verifica</strong> si el resto de las transacciones modificó los mismos archivos y, si es así, <strong>se aborta la transacción</strong>.</p>
 <ul>
+<li><strong>Diferencia con private workspace</strong>: los dos trabajan sobre una copia privada, pero private workspace por sí solo no dice qué hacer si otro modificó lo mismo. El control optimista agrega la <strong>validación</strong> al commitear, y si hay conflicto aborta.</li>
 <li><strong>Ventaja</strong>: libre de deadlocks, por lo que favorece el paralelismo.</li>
 <li><strong>Desventaja</strong>: rehacer todo puede ser costoso en condiciones de alta carga.</li>
 </ul>
@@ -1313,7 +1368,35 @@ let socket = TcpStream::connect("localhost:8080")?;</span>
 <li>Si los dos votaron SÍ → <strong>COMMIT</strong>: cada uno aplica los cambios y recién ahí libera los locks (2PL estricto). Si alguno votó NO o no respondió → <strong>ABORT</strong>: los dos deshacen y liberan.</li>
 </ol>
 <span class="warn">El costo de combinarlos: entre el voto y la decisión, el asiento y la cuenta quedan <strong>bloqueados</strong>. Si el coordinador se cae en ese momento, el asiento queda trabado hasta que vuelva (2PC es bloqueante). Por eso las transacciones tienen que ser cortas, y en la práctica se agregan timeouts.</span>
-<span class="tip">Por qué 2PL y no optimista acá: en una venta con mucha demanda (un hot sale, un vuelo que se agota) muchos clientes pelean por los mismos asientos. Con control optimista casi todas las compras abortarían en la validación y se reintentarían. Con 2PL hacen fila y la que llega tarde se entera enseguida de que el asiento ya no está.</span>`,
+<span class="tip">Por qué 2PL y no optimista acá: en una venta con mucha demanda (un hot sale, un vuelo que se agota) muchos clientes pelean por los mismos asientos. Con control optimista casi todas las compras abortarían en la validación y se reintentarían. Con 2PL hacen fila y la que llega tarde se entera enseguida de que el asiento ya no está.</span>
+<p><strong>5 · Reserva temporal con vencimiento.</strong> Las variantes de final (pasajes de micro, mesas de restaurante) agregan un paso entre <em>elegir</em> y <em>pagar</em>: el asiento queda <strong>reservado provisoriamente</strong> mientras el usuario paga, con un plazo (por ejemplo, 5 minutos). No conviene tener un lock tomado durante esos minutos, porque el usuario puede tardar o irse. Se parte en <strong>transacciones cortas</strong>:</p>
+<span class="rust">reservar(cliente, asiento):              // transacción corta con 2PL estricto
+  write_lock(asiento)
+  if asiento.estado != LIBRE:  ABORT
+  asiento.estado = RESERVADO
+  asiento.cliente = cliente
+  asiento.vence = ahora + 5 min
+  COMMIT; unlock(asiento)
+
+pagar(cliente, asiento):                 // 2PC entre asientos y pagos
+  PREPARE asientos: lock, ¿RESERVADO por este cliente y sin vencer?
+  PREPARE pagos:    lock de la cuenta, ¿hay fondos?
+  todos SÍ → COMMIT: asiento VENDIDO + cobro
+  alguno NO o timeout → ABORT
+
+liberar_vencidas():                      // periódico
+  RESERVADO con vence &lt; ahora → LIBRE</span>
+<p><strong>Entidades y mensajes</strong>: el <em>cliente</em> habla con el <em>servicio de compras</em>, que es el coordinador del 2PC; los participantes son el <em>sistema de asientos</em> y el <em>sistema de pagos</em>. Mensajes: RESERVAR / OK o NO_DISPONIBLE, PAGAR, PREPARE, SÍ / NO, COMMIT / ABORT, ACK.</p>
+<p><strong>Casos de éxito y de falla</strong> (lo que piden explicar):</p>
+<div class="tablewrap"><table>
+<tr><th>Caso</th><th>Qué pasa</th></tr>
+<tr><td>✅ Compra normal</td><td>Reserva OK, paga dentro del plazo, los dos participantes votan SÍ, COMMIT: el asiento queda VENDIDO y el cobro hecho.</td></tr>
+<tr><td>✅ Dos usuarios quieren el último asiento</td><td>El primero que toma el lock lo reserva. El segundo se bloquea en el lock, después ve RESERVADO y recibe NO_DISPONIBLE. No hay overbooking.</td></tr>
+<tr><td>❌ Pago rechazado</td><td>Pagos vota NO, el coordinador manda ABORT a todos, y el asiento vuelve a LIBRE. No queda un asiento reservado sin pagar ni un cobro sin asiento.</td></tr>
+<tr><td>❌ Vence el plazo</td><td>El usuario no paga a tiempo: la reserva vence y el asiento vuelve a LIBRE. Si después intenta pagar, el chequeo "sin vencer" falla en el PREPARE y no se le cobra.</td></tr>
+<tr><td>❌ Se cae el servidor de locks o el coordinador</td><td>Los locks y las reservas tienen <strong>vencimiento</strong>, así que no quedan tomados para siempre. Si el coordinador cae en medio del 2PC, los participantes que votaron SÍ esperan; al volver, el coordinador lee su <strong>log</strong> y reenvía la decisión. Para no depender de un solo nodo, el servicio se replica y, si cae el líder, se elige otro (bully o anillo).</td></tr>
+<tr><td>❌ Se cae un participante después de votar SÍ</td><td>Al volver lee su log, ve que estaba "preparado" y le pregunta la decisión al coordinador: no puede decidir solo.</td></tr>
+</table></div>`,
       },
       {
         title: 'Deadlock distribuido',
@@ -1403,7 +1486,8 @@ let socket = TcpStream::connect("localhost:8080")?;</span>
 <ul>
 <li><strong>Cantidad de actividades de comunicación</strong>: cantidad de transmisiones o costo de mensajes (M), y carga de trabajo por entidad. Es importante comparar cuántos mensajes requiere el algoritmo <strong>según la cantidad de entidades</strong> (por ejemplo, cantidad de mensajes para una elección de líder).</li>
 <li><strong>Tiempo</strong>: tiempo total de ejecución del protocolo, y <strong>tiempo ideal de ejecución</strong> (medido bajo ciertas condiciones: delays unitarios y relojes sincronizados).</li>
-</ul>`,
+</ul>
+<p><strong>Comparado con un sistema centralizado:</strong> en un algoritmo secuencial el costo se mide en pasos de cómputo (complejidad temporal) y memoria usada. En un ambiente distribuido, el procesamiento local de cada entidad se considera barato: lo que domina es la <strong>comunicación</strong>, o sea cuántos mensajes se mandan y cuánto tardan en llegar. Por eso dos algoritmos que resuelven lo mismo se comparan por su cantidad de mensajes en función de n (por ejemplo, 3 contra 2(n − 1) en exclusión mutua, o O(n) contra O(n²) en elección de líder).</p>`,
       },
       {
         title: 'Tiempo, eventos y conocimiento',

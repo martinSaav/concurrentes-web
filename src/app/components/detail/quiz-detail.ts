@@ -72,6 +72,43 @@ const QUESTIONS: Question[] = [
     explain: 'Si el closure tomara prestada una variable del stack, el hilo podría seguir usándola después de que esa función terminó. move transfiere el ownership al hilo. Para compartir de verdad entre hilos se usa Arc.',
   },
 
+  {
+    sec: 'Intro',
+    q: 'Un proceso hace wait sobre un semáforo en 0. ¿En qué estado queda?',
+    options: [
+      'Bloqueado: espera un evento (el signal) y no puede correr aunque haya CPU libre.',
+      'Listo: está esperando que le den la CPU.',
+      'En ejecución: sigue preguntando hasta que el semáforo cambie.',
+      'Terminado: el SO lo mata por no poder avanzar.',
+    ],
+    correct: 0,
+    explain: 'Los 5 estados: nuevo, listo, en ejecución, bloqueado y terminado. El signal lo pasa de bloqueado a listo. El que "sigue preguntando" en ejecución es el busy waiting, justo lo que el semáforo evita.',
+  },
+  {
+    sec: 'Intro',
+    q: '¿Qué es un proceso zombie?',
+    options: [
+      'Uno que ya terminó y liberó sus recursos, pero sigue en la tabla de procesos hasta que el padre lee su código de salida.',
+      'Uno que quedó en deadlock para siempre.',
+      'Uno que consume CPU sin hacer nada útil.',
+      'Uno cuyo padre terminó antes que él.',
+    ],
+    correct: 0,
+    explain: 'Hizo exit, pero el padre todavía no hizo wait para leer cómo terminó. Cuando el padre lo hace, desaparece del todo.',
+  },
+  {
+    sec: 'Intro',
+    q: '¿Cuál es la forma básica de proteger el estado compartido?',
+    options: [
+      'Serializar el acceso: marcar las regiones de código que lo tocan (secciones críticas) para que no se ejecuten a la vez.',
+      'Hacer que todos los procesos corran en el mismo núcleo.',
+      'Copiar el estado en cada thread y no sincronizar nunca.',
+      'Subir la prioridad de los procesos que escriben.',
+    ],
+    correct: 0,
+    explain: 'El resto del código sigue corriendo concurrentemente; solo se serializan las secciones críticas. La alternativa es no compartir: fork-join, canales o actores.',
+  },
+
   /* ---------- Fork-Join ---------- */
   {
     sec: 'Fork-Join',
@@ -132,6 +169,43 @@ const QUESTIONS: Question[] = [
     ],
     correct: 0,
     explain: 'La GPU optimiza throughput, no latencia. Conviene con mucho trabajo independiente y uniforme sobre muchos datos; para tareas chicas, la transferencia host ↔ device domina.',
+  },
+
+  {
+    sec: 'Fork-Join',
+    q: '¿Cuál es la performance ideal de fork-join?',
+    options: [
+      't(secuencial) / N(threads): un speedup lineal, si las tareas están balanceadas y partir y juntar cuesta poco.',
+      't(secuencial) × N(threads).',
+      'Siempre el mismo tiempo que la versión secuencial.',
+      't(secuencial) / N², porque cada thread también roba trabajo.',
+    ],
+    correct: 0,
+    explain: 'Es el ideal, no lo que pasa siempre. Se aleja si hay tareas desbalanceadas (el join espera a la más lenta) o si partir y combinar resultados es caro.',
+  },
+  {
+    sec: 'Fork-Join',
+    q: '¿Cuál es una desventaja del modelo fork-join?',
+    options: [
+      'El join espera a la subtarea más lenta: si están desbalanceadas, los demás threads quedan ociosos.',
+      'Produce race conditions porque los workers comparten estado.',
+      'Necesita un Mutex por cada subtarea.',
+      'No se puede usar en Rust.',
+    ],
+    correct: 0,
+    explain: 'Otras: solo aplica a problemas divisibles en subtareas independientes, y partir demasiado fino hace que el costo de crear y combinar tareas supere la ganancia. Work stealing ayuda con el desbalance.',
+  },
+  {
+    sec: 'Fork-Join',
+    q: '¿Cómo se implementa fork-join en la práctica (por ejemplo, Rayon)?',
+    options: [
+      'Un pool de workers, cada uno con su propio deque de tareas; las tareas se parten recursivamente y el que se queda sin trabajo roba.',
+      'Un thread nuevo por cada subtarea, que muere al terminar.',
+      'Un único thread que ejecuta las subtareas de a una.',
+      'Un proceso por subtarea, comunicados con sockets.',
+    ],
+    correct: 0,
+    explain: 'Crear y matar un thread por subtarea sería carísimo. Rayon reutiliza un pool fijo de workers y balancea con work stealing; par_iter() lo hace transparente.',
   },
 
   /* ---------- Locks ---------- */
@@ -206,6 +280,55 @@ const QUESTIONS: Question[] = [
     ],
     correct: 0,
     explain: 'Exclusión mutua (a lo sumo uno adentro), progreso (si nadie está adentro y alguien quiere, alguien entra) y espera acotada (nadie espera para siempre mientras otros entran una y otra vez).',
+  },
+
+  {
+    sec: 'Locks',
+    q: 'Los locks de archivos en UNIX (flock, fcntl) son "advisory". ¿Qué significa?',
+    options: [
+      'Que el SO no impide acceder al archivo sin pedir el lock: solo funcionan si todos los procesos respetan el protocolo.',
+      'Que el SO bloquea cualquier acceso al archivo mientras el lock esté tomado.',
+      'Que solo sirven para lectura.',
+      'Que se liberan solos después de un tiempo.',
+    ],
+    correct: 0,
+    explain: 'Hay shared locks (lectura, varios a la vez) y exclusive locks (escritura, uno solo). En Rust el dato vive dentro del Mutex o RwLock, así que el compilador no te deja tocarlo sin tomar el lock.',
+  },
+  {
+    sec: 'Locks',
+    q: '¿Cuál es la diferencia clave entre un mutex y un semáforo binario?',
+    options: [
+      'El mutex tiene dueño: solo el que lo tomó puede liberarlo. Un semáforo lo puede liberar (signal) cualquier proceso.',
+      'El semáforo binario permite dos procesos en la sección crítica.',
+      'El mutex hace busy waiting y el semáforo no.',
+      'No hay diferencia: son exactamente lo mismo.',
+    ],
+    correct: 0,
+    explain: 'Que cualquiera pueda hacer signal hace al semáforo más flexible (sirve para avisar entre procesos), pero también más fácil de desbalancear sin que nadie lo note.',
+  },
+  {
+    sec: 'Locks',
+    q: '¿Cuál es el efecto típico de una race condition en un programa?',
+    options: [
+      'Bugs intermitentes y datos corruptos: el resultado depende del orden de ejecución y es difícil de reproducir.',
+      'El programa se cuelga para siempre.',
+      'Un proceso nunca consigue el recurso.',
+      'El CPU queda al 100% sin hacer nada útil.',
+    ],
+    correct: 0,
+    explain: 'Colgarse para siempre es deadlock; no conseguir nunca el recurso es starvation; quemar CPU esperando es busy waiting. Son los cuatro "males" que suelen pedir comparar.',
+  },
+  {
+    sec: 'Locks',
+    q: 'En el modelo de la sección crítica, ¿qué se le exige a la parte NO crítica de un proceso?',
+    options: [
+      'Nada: puede terminar o quedarse en un loop infinito sin afectar a los demás. Solo la sección crítica tiene que progresar.',
+      'Que termine siempre en tiempo acotado.',
+      'Que se ejecute en exclusión mutua.',
+      'Que libere todos los locks del sistema.',
+    ],
+    correct: 0,
+    explain: 'Si un proceso entra a la sección crítica, tiene que salir. Afuera puede hacer lo que quiera: por eso la solución no puede depender de que los demás "colaboren" desde la parte no crítica.',
   },
 
   /* ---------- Sincronización ---------- */
@@ -306,6 +429,55 @@ const QUESTIONS: Question[] = [
     explain: 'Lo de "uno con mala suerte sistemática mientras el resto progresa" es starvation, no livelock.',
   },
 
+  {
+    sec: 'Sincronización',
+    q: '¿Una condition variable es lo mismo que un monitor?',
+    options: [
+      'No: el monitor encapsula datos, procedimientos y exclusión mutua; la condition variable es una pieza del monitor, una cola de espera.',
+      'Sí, son dos nombres para la misma estructura.',
+      'No: la condition variable guarda un contador y el monitor no.',
+      'Sí, pero la condition variable solo existe en Rust.',
+    ],
+    correct: 0,
+    explain: 'Una imagen útil: el monitor es la sala de control y la condition variable es la lista de espera. No guarda valor, solo una cola FIFO, con waitC, signalC y empty.',
+  },
+  {
+    sec: 'Sincronización',
+    q: 'Hay que limitar a 5 las conexiones simultáneas a una base de datos. ¿Qué conviene usar?',
+    options: [
+      'Un semáforo contador inicializado en 5: wait antes de usar una conexión y signal al devolverla.',
+      'Un monitor con una condition variable por conexión.',
+      'Una barrera de 5 hilos.',
+      'Un Mutex por conexión, tomados en orden.',
+    ],
+    correct: 0,
+    explain: 'Para recursos idénticos que se cuentan, el semáforo es lo más natural. El monitor conviene cuando hay un estado compuesto con varias condiciones, como una cola de impresión o un buffer.',
+  },
+  {
+    sec: 'Sincronización',
+    q: '¿Qué pasa en una barrera cuando llega el último de los N procesos?',
+    options: [
+      'Se liberan todos los que estaban bloqueados esperando y continúan.',
+      'Se libera solo el último que llegó.',
+      'Se libera el primero que llegó y los demás siguen esperando.',
+      'La barrera se destruye y hay que crear otra.',
+    ],
+    correct: 0,
+    explain: 'La barrera tiene esencialmente una sola operación: esperar. En Rust se reutiliza sola para la ronda siguiente, y is_leader() es true para un solo hilo por ronda.',
+  },
+  {
+    sec: 'Sincronización',
+    q: '¿Por qué el busy waiting es un problema aunque la sincronización sea correcta?',
+    options: [
+      'Porque el hilo que espera gasta CPU dando vueltas, y se la quita al que tiene que hacer verdadera la condición.',
+      'Porque siempre provoca deadlock.',
+      'Porque rompe la exclusión mutua.',
+      'Porque el compilador de Rust no lo permite.',
+    ],
+    correct: 0,
+    explain: 'La alternativa es bloquearse: semáforos, condition variables, recv() o await. El proceso pasa a estado bloqueado y no consume CPU hasta que lo despiertan.',
+  },
+
   /* ---------- Petri ---------- */
   {
     sec: 'Petri',
@@ -378,6 +550,31 @@ const QUESTIONS: Question[] = [
     ],
     correct: 0,
     explain: 'Depositar consume un "libre" y produce un "ítem"; retirar hace lo inverso. La suma nunca cambia, así que buffer ≤ N siempre.',
+  },
+
+  {
+    sec: 'Petri',
+    q: 'En una red de Petri, la base admite 3 técnicos a la vez y hace falta un parche cada 3 diagnósticos. ¿Cómo se modela "cada 3"?',
+    options: [
+      'Con un lugar que cuenta los diagnósticos terminados y un arco de peso 3 hacia la transición "aplicar parche".',
+      'Con 3 transiciones "aplicar parche" iguales.',
+      'Con un arco inhibidor de peso 3.',
+      'No se puede: las redes de Petri no cuentan.',
+    ],
+    correct: 0,
+    explain: 'Los contadores son lugares con tokens y "esperar N" es un arco de peso N. Para "solo si no hay nadie trabajando" se agrega un arco inhibidor desde el lugar "diagnosticando".',
+  },
+  {
+    sec: 'Petri',
+    q: '¿Cuál es la principal limitación práctica de analizar una red con su grafo de alcance?',
+    options: [
+      'La explosión de estados: con muchos lugares y tokens, la cantidad de marcados alcanzables crece enormemente.',
+      'Que no detecta deadlocks.',
+      'Que solo funciona con redes de un lugar.',
+      'Que requiere ejecutar el programa real.',
+    ],
+    correct: 0,
+    explain: 'Por eso se usa sobre modelos chicos y bien abstraídos. Con redes no acotadas el grafo directamente es infinito.',
   },
 
   /* ---------- Mensajes ---------- */
@@ -466,6 +663,43 @@ const QUESTIONS: Question[] = [
     explain: 'Y try_send intenta mandar al toque: falla si la casilla está llena o cerrada.',
   },
 
+  {
+    sec: 'Mensajes',
+    q: '¿Cuál es el orden del ciclo de vida de un actor en Actix?',
+    options: [
+      'Started → Running → Stopping → Stopped.',
+      'Created → Waiting → Running → Dead.',
+      'Running → Started → Stopped → Stopping.',
+      'New → Ready → Blocked → Terminated.',
+    ],
+    correct: 0,
+    explain: 'Pasa a Stopping cuando se llama ctx.stop(), cuando ningún otro actor lo referencia o cuando su contexto queda vacío. "New → Ready → Blocked → Terminated" se parece a los estados de un proceso, no de un actor.',
+  },
+  {
+    sec: 'Mensajes',
+    q: '¿Por qué los mensajes entre actores son inmutables?',
+    options: [
+      'Para que nadie pueda modificar un dato mientras otro lo usa: sin mutación compartida no hay race conditions.',
+      'Para que ocupen menos memoria.',
+      'Porque Actix no permite structs con campos.',
+      'Para poder mandarlos por UDP.',
+    ],
+    correct: 0,
+    explain: 'Una vez enviado, ni el emisor ni el receptor pueden cambiar el mensaje que el otro ve. Junto con el estado privado de cada actor, eso elimina las secciones críticas.',
+  },
+  {
+    sec: 'Mensajes',
+    q: '¿Cuál es la motivación principal del modelo de actores?',
+    options: [
+      'Evitar el estado mutable compartido y los locks: los actores no comparten nada y solo se comunican por mensajes.',
+      'Hacer que cada función corra en su propio proceso del SO.',
+      'Reemplazar a las redes de Petri para modelar sistemas.',
+      'Aprovechar las instrucciones SIMD del procesador.',
+    ],
+    correct: 0,
+    explain: 'Sin memoria compartida no hay race conditions ni locks que olvidar, y el mismo modelo sirve en una máquina o distribuido. Toma ideas de la orientación a objetos: cada actor encapsula su estado y su comportamiento.',
+  },
+
   /* ---------- Async ---------- */
   {
     sec: 'Async',
@@ -538,6 +772,31 @@ const QUESTIONS: Question[] = [
     ],
     correct: 0,
     explain: 'Async: mucho I/O y poco cálculo, cada tarea pesa ~1 KB. Threads o rayon: cálculo pesado, porque async no te da más núcleos.',
+  },
+
+  {
+    sec: 'Async',
+    q: '¿Qué es una tarea en programación asincrónica?',
+    options: [
+      'Una unidad liviana de ejecución que administra el executor: se suspende en cada await y se reanuda cuando su future está listo.',
+      'Un thread del sistema operativo con su propio stack.',
+      'Un proceso hijo creado con fork.',
+      'Una función que siempre bloquea hasta terminar.',
+    ],
+    correct: 0,
+    explain: 'Muchas tareas comparten pocos threads. El cambio entre tareas no pasa por el SO: lo hace el executor en cada await.',
+  },
+  {
+    sec: 'Async',
+    q: 'Mientras una tarea espera en un .await, ¿qué pasa con el thread en el que corría?',
+    options: [
+      'Queda libre: el control vuelve al executor, que puede ejecutar otras tareas en ese mismo thread.',
+      'Queda bloqueado hasta que llegue el resultado.',
+      'Se destruye y se crea otro cuando llega el resultado.',
+      'Hace busy waiting preguntando por el resultado.',
+    ],
+    correct: 0,
+    explain: 'Esa es toda la diferencia con un read() bloqueante de threads: await suspende la tarea, no el thread.',
   },
 
   /* ---------- Distribuidos ---------- */
@@ -696,6 +955,126 @@ const QUESTIONS: Question[] = [
     ],
     correct: 0,
     explain: 'Métrica: números sobre la red (cantidad de nodos, diámetro). Propiedades topológicas: "es un anillo", "es acíclico". Mapas topológicos: la vecindad hasta distancia d, como una matriz de adyacencia.',
+  },
+  {
+    sec: 'Distribuidos',
+    q: '¿Qué modelo de concurrencia impone un socket?',
+    options: [
+      'Ninguno: el servidor elige cómo atender muchas conexiones (un thread por conexión, un pool, async o actores).',
+      'Siempre un thread por conexión.',
+      'Siempre asincrónico con event loop.',
+      'Siempre el modelo de actores.',
+    ],
+    correct: 0,
+    explain: 'El socket es solo la abstracción del SO para mandar y recibir datos. Thread por conexión es lo más simple; async es lo que más escala con miles de conexiones.',
+  },
+  {
+    sec: 'Distribuidos',
+    q: 'En el modelo OSI, ¿qué capa da comunicación extremo a extremo entre procesos (puertos, TCP/UDP)?',
+    options: [
+      'La de transporte (capa 4).',
+      'La de red (capa 3).',
+      'La de enlace (capa 2).',
+      'La de sesión (capa 5).',
+    ],
+    correct: 0,
+    explain: 'Red lleva paquetes entre máquinas (IP, ruteo); transporte los lleva entre procesos (puertos). Los sockets TCP y UDP viven en transporte.',
+  },
+  {
+    sec: 'Distribuidos',
+    q: '¿Qué agrega una arquitectura cliente-servidor de tres niveles respecto de una de dos?',
+    options: [
+      'Un middleware entre cliente y servidor, que provee principalmente seguridad y balanceo de carga.',
+      'Un segundo cliente de respaldo.',
+      'Una base de datos dentro del cliente.',
+      'Un canal UDP además del TCP.',
+    ],
+    correct: 0,
+    explain: 'En dos niveles el cliente habla directo con el servidor. Y no confundir con los tipos de servidor: iterativo (de a una petición) o concurrente (varias a la vez).',
+  },
+  {
+    sec: 'Distribuidos',
+    q: 'En token ring, ¿qué pasa si se cae el proceso que tiene el token?',
+    options: [
+      'Hay que detectarlo (timeouts, ping/pong) y regenerar el token, cuidando que no queden dos.',
+      'Nada: el token aparece solo en el siguiente proceso.',
+      'Se elige un coordinador central para siempre.',
+      'Todos los procesos entran a la sección crítica a la vez.',
+    ],
+    correct: 0,
+    explain: 'Si no se regenera, nadie más entra nunca. Y el token no se puede guardar "para cuando lo necesite": si no lo usás, lo pasás.',
+  },
+  {
+    sec: 'Distribuidos',
+    q: 'Al abortar una transacción implementada con Write-Ahead Log, ¿cómo se deshacen los cambios?',
+    options: [
+      'Se recorre el log de atrás hacia adelante restaurando los valores anteriores.',
+      'Se descarta la copia privada, sin tocar los archivos.',
+      'Se pide a los demás procesos que repitan la transacción.',
+      'No se puede: con WAL los cambios son siempre definitivos.',
+    ],
+    correct: 0,
+    explain: 'Con WAL los archivos se modifican en el lugar, pero cada cambio se anota antes en el log. Descartar la copia es lo que hace private workspace.',
+  },
+  {
+    sec: 'Distribuidos',
+    q: '¿En qué se diferencia el control optimista de un private workspace solo?',
+    options: [
+      'El optimista valida al commitear si otra transacción modificó lo mismo, y si es así aborta.',
+      'El optimista toma locks y el private workspace no.',
+      'El private workspace usa timestamps y el optimista no.',
+      'No hay diferencia.',
+    ],
+    correct: 0,
+    explain: 'Los dos trabajan sobre una copia privada. Lo que agrega el optimista es el chequeo de conflictos en el commit.',
+  },
+  {
+    sec: 'Distribuidos',
+    q: 'Con 2PL, T1 toma el lock de A y después pide B; T2 toma B y después pide A. ¿Qué pasa?',
+    options: [
+      'Deadlock: cada una espera un lock que tiene la otra. 2PL garantiza serializabilidad, pero no evita deadlocks.',
+      'Nada: 2PL evita los deadlocks por diseño.',
+      'T2 aborta automáticamente porque pidió segunda.',
+      'Las dos entran en la fase de contracción y liberan.',
+    ],
+    correct: 0,
+    explain: 'Se resuelve con orden global de locks, wait-die o wound-wait, o timeouts. Ninguna puede liberar porque todavía está en su fase de expansión.',
+  },
+  {
+    sec: 'Distribuidos',
+    q: 'En una compra con reserva temporal, ¿por qué no conviene tener tomado el lock del asiento mientras el usuario paga?',
+    options: [
+      'Porque el usuario puede tardar minutos o irse: el lock bloquearía a todos. Se reserva con un vencimiento y se liberan los locks enseguida.',
+      'Porque los locks no se pueden tomar más de un segundo.',
+      'Porque el pago no necesita consistencia.',
+      'Porque 2PL prohíbe tomar locks antes de pagar.',
+    ],
+    correct: 0,
+    explain: 'Se parte en transacciones cortas: reservar (estado RESERVADO + vencimiento) y pagar (2PC con el sistema de pagos, que verifica que la reserva siga vigente). Si vence, el asiento vuelve a LIBRE.',
+  },
+  {
+    sec: 'Distribuidos',
+    q: 'Al comparar algoritmos distribuidos, ¿qué costo domina sobre el procesamiento local?',
+    options: [
+      'La comunicación: la cantidad de mensajes (en función de n) y el tiempo que tardan.',
+      'La memoria RAM de cada entidad.',
+      'La cantidad de líneas de código.',
+      'El número de núcleos de cada máquina.',
+    ],
+    correct: 0,
+    explain: 'En un sistema centralizado se cuentan pasos de cómputo; en uno distribuido se cuentan mensajes y tiempo. Por eso se compara, por ejemplo, 3 contra 2(n − 1) mensajes en exclusión mutua.',
+  },
+  {
+    sec: 'Distribuidos',
+    q: 'Entre las restricciones temporales de un ambiente distribuido, ¿qué permite el "delay acotado"?',
+    options: [
+      'Definir timeouts: si existe un Δ máximo de demora, pasado ese tiempo se puede asumir que algo falló.',
+      'Que todos los mensajes lleguen en exactamente una unidad de tiempo.',
+      'Que los relojes de todas las entidades estén sincronizados.',
+      'Que no haya fallas en la red.',
+    ],
+    correct: 0,
+    explain: '"Exactamente una unidad de tiempo" es el delay unitario, y los relojes sincronizados son otra restricción aparte. Los axiomas, en cambio, siempre valen: delays finitos y orientación local.',
   },
 ];
 
