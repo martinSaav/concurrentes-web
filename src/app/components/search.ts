@@ -270,6 +270,9 @@ export class Search {
 
       // puntaje: título pesa mucho más que el cuerpo
       let score = 0;
+      // la frase completa ("modelo osi") pesa más que sus palabras sueltas
+      const phrase = words.join(' ');
+      if (words.length > 1 && e.hay.includes(phrase)) score += 150;
       for (const w of words) {
         if (e.titleNorm.includes(w)) score += 100;
         const n = e.hay.split(w).length - 1;
