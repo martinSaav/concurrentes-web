@@ -31,6 +31,7 @@ import { RicartDetail } from '../components/detail/ricart-detail';
 import { WaitdieDetail } from '../components/detail/waitdie-detail';
 import { SimdDetail } from '../components/detail/simd-detail';
 import { GpuDetail } from '../components/detail/gpu-detail';
+import { QuizDetail } from '../components/detail/quiz-detail';
 
 @Component({
   selector: 'app-section',
@@ -67,6 +68,7 @@ import { GpuDetail } from '../components/detail/gpu-detail';
     WaitdieDetail,
     SimdDetail,
     GpuDetail,
+    QuizDetail,
   ],
   template: `
     @if (section(); as sec) {
@@ -79,7 +81,7 @@ import { GpuDetail } from '../components/detail/gpu-detail';
 
         <nav class="toc">
           @for (t of sec.topics; track $index; let i = $index) {
-            <a [href]="'#t' + i" class="toc-item">{{ i + 1 }}. {{ t.title }}</a>
+            <a [routerLink]="['/s', sec.slug]" [fragment]="'t' + i" class="toc-item">{{ i + 1 }}. {{ t.title }}</a>
           }
         </nav>
 
@@ -119,6 +121,7 @@ import { GpuDetail } from '../components/detail/gpu-detail';
               @case ('waitdie-detail') { <app-waitdie-detail /> }
               @case ('simd-detail') { <app-simd-detail /> }
               @case ('gpu-detail') { <app-gpu-detail /> }
+              @case ('quiz-detail') { <app-quiz-detail /> }
             }
           </article>
         }

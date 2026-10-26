@@ -32,7 +32,8 @@ export interface Topic {
     | 'ricart-detail'
     | 'waitdie-detail'
     | 'simd-detail'
-    | 'gpu-detail'; // componentes a medida
+    | 'gpu-detail'
+    | 'quiz-detail'; // componentes a medida
 }
 
 export interface Section {
@@ -334,7 +335,7 @@ let s = ['a','b','c','d','e'].par_iter()
 <li><strong>Espera acotada (bounded waiting)</strong>: nadie espera para siempre mientras otros entran una y otra vez — sin starvation. <em>(fairness)</em></li>
 </ol>
 <p>El modelo mental: cada proceso concurrente ejecuta un <strong>loop infinito</strong> cuyo código se divide en <strong>parte crítica</strong> y <strong>parte no-crítica</strong>. La sección crítica debe <strong>progresar</strong> (si entrás, eventualmente terminás y salís); la parte NO crítica no requiere progreso ni exclusividad — el proceso puede terminar ahí, o quedarse en un loop infinito, sin afectar a los demás.</p>
-<span class="tip">Deadlock viola <em>liveness</em> (nadie progresa) sin violar <em>safety</em> (nadie rompió la exclusión mutua). Un programa colgado es "seguro" — ese contraste es la distinción clásica entre las dos familias de propiedades.</span>`,
+<span class="tip">Ojo con la clasificación de la cátedra: la <strong>ausencia de deadlock</strong> es de <em>safety</em>, porque un deadlock pasa en un instante concreto (el estado en que todos quedaron esperándose). <strong>Starvation</strong> y <strong>livelock</strong>, en cambio, son de <em>liveness</em>: nunca podés señalar el momento en que se rompió, solo que el proceso nunca avanzó. Y fijate que un programa colgado sigue cumpliendo la exclusión mutua: por eso hacen falta varias propiedades, no alcanza con una.</span>`,
       },
       {
         title: 'Locks: el mecanismo',
@@ -619,7 +620,7 @@ if wait_result.is_leader() {
 <li><strong>Mozo/tickets (máx N−1 sentados)</strong>: rompe la posibilidad del ciclo completo — es un semáforo con N−1 permisos.</li>
 <li><strong><code>try_lock</code> + soltar todo y reintentar</strong>: rompe hold-and-wait… pero puede degenerar en <strong>livelock</strong> (todos sueltan y reintentan sincronizados, nadie come — se mueven pero no progresan).</li>
 </ul>
-<span class="tip">Deadlock vs livelock vs starvation: en deadlock nadie se mueve; en livelock se mueven pero no progresan; en starvation el sistema progresa pero UNO tiene mala suerte sistemáticamente. Las tres violan liveness.</span>`,
+<span class="tip">Deadlock vs livelock vs starvation: en deadlock nadie se mueve; en livelock se mueven pero no progresan; en starvation el sistema progresa pero UNO tiene mala suerte sistemáticamente. En la clasificación de la cátedra, la ausencia de deadlock es de safety; la de starvation (y la de livelock) es de liveness.</span>`,
       },
       {
         title: 'Los otros clásicos: barbero, fumadores y banquero',
@@ -1418,6 +1419,25 @@ let socket = TcpStream::connect("localhost:8080")?;</span>
 <li><strong>Mapas topológicos</strong>: un mapa de la vecindad de la entidad hasta una distancia d. Ej: matriz de adyacencia del grafo.</li>
 </ul>
 <span class="tip">Por qué importa el conocimiento: muchos algoritmos distribuidos <strong>solo son posibles</strong> si las entidades tienen cierto conocimiento previo. Por ejemplo, elegir líder en un anillo es muy distinto si las entidades saben cuántas son (n) que si no lo saben.</span>`,
+      },
+    ],
+  },
+  /* ================================================================ */
+  {
+    slug: 'quiz',
+    title: 'Modo Quiz',
+    short: 'Quiz',
+    icon: '🎯',
+    color: '#ec4899',
+    tag: 'Autoevaluación',
+    tagline: 'Preguntas tipo final por sección, con las trampas explicadas.',
+    topics: [
+      {
+        title: 'Autoevaluación antes del final',
+        widget: 'quiz-detail',
+        html: `
+<p>Elegí una <strong>sección</strong> (o "Todas") y respondé. Cada pregunta te dice si acertaste y explica <strong>la trampa</strong> que suele caer. Las opciones se mezclan en cada intento, así que no sirve memorizar la letra.</p>
+<span class="tip">Si fallás una, no pases de largo: leé la explicación y volvé a esa sección del resumen. Con el buscador (<strong>Ctrl K</strong>) llegás directo al tema.</span>`,
       },
     ],
   },
