@@ -37,7 +37,7 @@ import { SECTIONS } from '../data/content';
           <div class="card-title">{{ s.title }}</div>
           <div class="card-tag">{{ s.tagline }}</div>
           <div class="card-meta">
-            {{ s.topics.length }} temas
+            {{ s.topics.length }} tema{{ s.topics.length === 1 ? '' : 's' }}
             @if (animCount(s.slug); as n) {
               · {{ n }} animación{{ n > 1 ? 'es' : '' }} ▶
             }
