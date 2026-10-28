@@ -121,7 +121,11 @@ import { QuizDetail } from '../components/detail/quiz-detail';
               @case ('waitdie-detail') { <app-waitdie-detail /> }
               @case ('simd-detail') { <app-simd-detail /> }
               @case ('gpu-detail') { <app-gpu-detail /> }
-              @case ('quiz-detail') { <app-quiz-detail /> }
+              @case ('quiz-detail') {
+                <!-- el banco de preguntas pesa: se baja recién al llegar a la sección -->
+                @defer (on viewport; prefetch on idle) { <app-quiz-detail /> }
+                @placeholder { <div class="wph"></div> }
+              }
             }
           </article>
         }
@@ -180,6 +184,8 @@ import { QuizDetail } from '../components/detail/quiz-detail';
     .toc-item:hover { color: var(--c); border-color: var(--c); }
 
     .topic { margin-bottom: 36px; scroll-margin-top: 20px; }
+    /* lugar reservado mientras carga un widget diferido, para que el scroll no salte */
+    .wph { min-height: 420px; margin: 18px 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel); }
     .topic h2 {
       display: flex;
       align-items: center;
