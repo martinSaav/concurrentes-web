@@ -90,37 +90,130 @@ import { QuizDetail } from '../components/detail/quiz-detail';
             <h2><span class="num">{{ i + 1 }}</span> {{ t.title }}</h2>
             <div class="topic-body" [innerHTML]="t.html"></div>
             @switch (t.widget) {
-              @case ('race-detail') { <app-race-detail /> }
-              @case ('mutex-detail') { <app-mutex-detail /> }
-              @case ('sem-detail') { <app-sem-detail /> }
-              @case ('condvar-detail') { <app-condvar-detail /> }
-              @case ('deadlock-detail') { <app-deadlock-detail /> }
-              @case ('rwlock-detail') { <app-rwlock-detail /> }
-              @case ('forkjoin-detail') { <app-forkjoin-detail /> }
-              @case ('mpsc-detail') { <app-mpsc-detail /> }
-              @case ('actors-detail') { <app-actors-detail /> }
-              @case ('async-detail') { <app-async-detail /> }
-              @case ('poll-detail') { <app-poll-detail /> }
-              @case ('leader-detail') { <app-leader-detail /> }
-              @case ('twophase-detail') { <app-twophase-detail /> }
-              @case ('distmutex-detail') { <app-distmutex-detail /> }
-              @case ('petri-detail') { <app-petri-detail /> }
-              @case ('reach-detail') { <app-reach-detail /> }
-              @case ('reach-carga') { <app-reach-detail start="carga" /> }
-              @case ('memory-detail') { <app-memory-detail /> }
-              @case ('timeline-detail') { <app-timeline-detail /> }
-              @case ('sockets-detail') { <app-sockets-detail /> }
-              @case ('waitgraph-detail') { <app-waitgraph-detail /> }
-              @case ('barrier-detail') { <app-barrier-detail /> }
-              @case ('workstealing-detail') { <app-workstealing-detail /> }
-              @case ('arc-detail') { <app-arc-detail /> }
-              @case ('twopl-detail') { <app-twopl-detail /> }
-              @case ('optimistic-detail') { <app-optimistic-detail /> }
-              @case ('lamport-detail') { <app-lamport-detail /> }
-              @case ('ricart-detail') { <app-ricart-detail /> }
-              @case ('waitdie-detail') { <app-waitdie-detail /> }
-              @case ('simd-detail') { <app-simd-detail /> }
-              @case ('gpu-detail') { <app-gpu-detail /> }
+              @case ('race-detail') {
+                @defer (on viewport; prefetch on idle) { <app-race-detail /> }
+                @placeholder { <div class="wph"></div> }
+              }
+              @case ('mutex-detail') {
+                @defer (on viewport; prefetch on idle) { <app-mutex-detail /> }
+                @placeholder { <div class="wph"></div> }
+              }
+              @case ('sem-detail') {
+                @defer (on viewport; prefetch on idle) { <app-sem-detail /> }
+                @placeholder { <div class="wph"></div> }
+              }
+              @case ('condvar-detail') {
+                @defer (on viewport; prefetch on idle) { <app-condvar-detail /> }
+                @placeholder { <div class="wph"></div> }
+              }
+              @case ('deadlock-detail') {
+                @defer (on viewport; prefetch on idle) { <app-deadlock-detail /> }
+                @placeholder { <div class="wph"></div> }
+              }
+              @case ('rwlock-detail') {
+                @defer (on viewport; prefetch on idle) { <app-rwlock-detail /> }
+                @placeholder { <div class="wph"></div> }
+              }
+              @case ('forkjoin-detail') {
+                @defer (on viewport; prefetch on idle) { <app-forkjoin-detail /> }
+                @placeholder { <div class="wph"></div> }
+              }
+              @case ('mpsc-detail') {
+                @defer (on viewport; prefetch on idle) { <app-mpsc-detail /> }
+                @placeholder { <div class="wph"></div> }
+              }
+              @case ('actors-detail') {
+                @defer (on viewport; prefetch on idle) { <app-actors-detail /> }
+                @placeholder { <div class="wph"></div> }
+              }
+              @case ('async-detail') {
+                @defer (on viewport; prefetch on idle) { <app-async-detail /> }
+                @placeholder { <div class="wph"></div> }
+              }
+              @case ('poll-detail') {
+                @defer (on viewport; prefetch on idle) { <app-poll-detail /> }
+                @placeholder { <div class="wph"></div> }
+              }
+              @case ('leader-detail') {
+                @defer (on viewport; prefetch on idle) { <app-leader-detail /> }
+                @placeholder { <div class="wph"></div> }
+              }
+              @case ('twophase-detail') {
+                @defer (on viewport; prefetch on idle) { <app-twophase-detail /> }
+                @placeholder { <div class="wph"></div> }
+              }
+              @case ('distmutex-detail') {
+                @defer (on viewport; prefetch on idle) { <app-distmutex-detail /> }
+                @placeholder { <div class="wph"></div> }
+              }
+              @case ('petri-detail') {
+                @defer (on viewport; prefetch on idle) { <app-petri-detail /> }
+                @placeholder { <div class="wph"></div> }
+              }
+              @case ('reach-detail') {
+                @defer (on viewport; prefetch on idle) { <app-reach-detail /> }
+                @placeholder { <div class="wph"></div> }
+              }
+              @case ('reach-carga') {
+                @defer (on viewport; prefetch on idle) { <app-reach-detail start="carga" /> }
+                @placeholder { <div class="wph"></div> }
+              }
+              @case ('memory-detail') {
+                @defer (on viewport; prefetch on idle) { <app-memory-detail /> }
+                @placeholder { <div class="wph"></div> }
+              }
+              @case ('timeline-detail') {
+                @defer (on viewport; prefetch on idle) { <app-timeline-detail /> }
+                @placeholder { <div class="wph"></div> }
+              }
+              @case ('sockets-detail') {
+                @defer (on viewport; prefetch on idle) { <app-sockets-detail /> }
+                @placeholder { <div class="wph"></div> }
+              }
+              @case ('waitgraph-detail') {
+                @defer (on viewport; prefetch on idle) { <app-waitgraph-detail /> }
+                @placeholder { <div class="wph"></div> }
+              }
+              @case ('barrier-detail') {
+                @defer (on viewport; prefetch on idle) { <app-barrier-detail /> }
+                @placeholder { <div class="wph"></div> }
+              }
+              @case ('workstealing-detail') {
+                @defer (on viewport; prefetch on idle) { <app-workstealing-detail /> }
+                @placeholder { <div class="wph"></div> }
+              }
+              @case ('arc-detail') {
+                @defer (on viewport; prefetch on idle) { <app-arc-detail /> }
+                @placeholder { <div class="wph"></div> }
+              }
+              @case ('twopl-detail') {
+                @defer (on viewport; prefetch on idle) { <app-twopl-detail /> }
+                @placeholder { <div class="wph"></div> }
+              }
+              @case ('optimistic-detail') {
+                @defer (on viewport; prefetch on idle) { <app-optimistic-detail /> }
+                @placeholder { <div class="wph"></div> }
+              }
+              @case ('lamport-detail') {
+                @defer (on viewport; prefetch on idle) { <app-lamport-detail /> }
+                @placeholder { <div class="wph"></div> }
+              }
+              @case ('ricart-detail') {
+                @defer (on viewport; prefetch on idle) { <app-ricart-detail /> }
+                @placeholder { <div class="wph"></div> }
+              }
+              @case ('waitdie-detail') {
+                @defer (on viewport; prefetch on idle) { <app-waitdie-detail /> }
+                @placeholder { <div class="wph"></div> }
+              }
+              @case ('simd-detail') {
+                @defer (on viewport; prefetch on idle) { <app-simd-detail /> }
+                @placeholder { <div class="wph"></div> }
+              }
+              @case ('gpu-detail') {
+                @defer (on viewport; prefetch on idle) { <app-gpu-detail /> }
+                @placeholder { <div class="wph"></div> }
+              }
               @case ('quiz-detail') {
                 <!-- el banco de preguntas pesa: se baja recién al llegar a la sección -->
                 @defer (on viewport; prefetch on idle) { <app-quiz-detail /> }

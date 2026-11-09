@@ -227,7 +227,7 @@ interface Hit extends Entry {
     .chip:hover { color: var(--accent); border-color: var(--accent); }
 
     @media (max-width: 640px) {
-      .ov { padding: 4vh 10px 10px; }
+      .ov { padding: 64px 10px 10px; } /* debajo del botón ✕ del menú, que es fijo */
       .opener kbd, .esc { display: none; }
     }
   `,
